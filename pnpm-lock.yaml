@@ -49,16 +49,37 @@ importers:
 
   agents/rex:
     dependencies:
+      '@google/genai':
+        specifier: ^1.0.0
+        version: 1.46.0
       '@sd-legal/shared':
         specifier: workspace:*
         version: link:../../shared
+      node-cron:
+        specifier: ^3.0.3
+        version: 3.0.3
+      uuid:
+        specifier: ^11.1.0
+        version: 11.1.0
     devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.37
+      '@types/node-cron':
+        specifier: ^3.0.11
+        version: 3.0.11
+      '@types/uuid':
+        specifier: ^10.0.0
+        version: 10.0.0
       tsx:
         specifier: ^4.19.0
         version: 4.21.0
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@20.19.37)(tsx@4.21.0)
 
   agents/sonia:
     dependencies:
