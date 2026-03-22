@@ -181,18 +181,21 @@ export class SupervisedMode {
       return { action: "unknown" };
     }
 
-    // Send text first
-    await this.gateway.sendMessage(draft.clientPhone, draft.proposedResponse);
-
-    // Generate and send audio
+    // Send only audio
     if (this.tts?.isEnabled()) {
       const audio = await this.tts.textToSpeech(draft.proposedResponse);
       if (audio) {
         await this.gateway.sendAudio(draft.clientPhone, audio);
         console.log(`[Supervisionado] Áudio enviado a ${draft.clientPhone}`);
+      } else {
+        // Fallback to text if audio generation fails
+        await this.gateway.sendMessage(draft.clientPhone, draft.proposedResponse);
+        console.log("[Supervisionado] Áudio falhou — texto enviado como fallback");
       }
     } else {
-      console.log("[Supervisionado] TTS não disponível — só texto enviado");
+      // Fallback to text if TTS not available
+      await this.gateway.sendMessage(draft.clientPhone, draft.proposedResponse);
+      console.log("[Supervisionado] TTS não disponível — texto enviado como fallback");
     }
 
     this.pendingDrafts.delete(draftId);
@@ -200,7 +203,7 @@ export class SupervisedMode {
     if (this.controlGroupJid) {
       await this.gateway.sendToGroup(
         this.controlGroupJid,
-        `✅🔊 Resposta ${draftId} enviada (texto + áudio) a ${draft.clientName ?? draft.clientPhone}`
+        `🔊 Resposta ${draftId} enviada (áudio) a ${draft.clientName ?? draft.clientPhone}`
       );
     }
 
@@ -258,7 +261,7 @@ ${draft.proposedResponse}
 🆔 *${draft.id}*
 
 → *ENVIAR ${draft.id}* para aprovar (texto)
-→ *AUDIO ${draft.id}* para aprovar (texto + áudio)
+→ *AUDIO ${draft.id}* para aprovar (só áudio)
 → *EDITAR ${draft.id}* seguido do novo texto
 → *IGNORAR ${draft.id}* para descartar`;
   }
