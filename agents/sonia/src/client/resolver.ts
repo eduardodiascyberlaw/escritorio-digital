@@ -1,0 +1,112 @@
+import type { ClienteNivel1 } from "@sd-legal/shared";
+import type { CrmAdapter } from "./crm-adapter.js";
+import type { ProJurisAdapter } from "./projuris-adapter.js";
+import type { DriveAdapter } from "./drive-adapter.js";
+import { validateNivel1 } from "./nivel-validator.js";
+
+export interface ResolvedClient {
+  clienteId: string;
+  source: "crm" | "projuris" | "drive" | "new";
+  data: Partial<ClienteNivel1>;
+  nivel1Complete: boolean;
+  missing: string[];
+  pendingValidation: boolean;
+}
+
+export async function resolveClient(
+  phone: string,
+  name: string | null,
+  adapters: {
+    crm: CrmAdapter;
+    projuris: ProJurisAdapter;
+    drive: DriveAdapter;
+  }
+): Promise<ResolvedClient> {
+  // 1. Search CRM AG by phone number
+  const crmClient = await adapters.crm.findByPhone(phone);
+  if (crmClient) {
+    const validation = validateNivel1(crmClient);
+    const clienteId =
+      (crmClient as Record<string, unknown>)["id"] as string ?? phone;
+    return {
+      clienteId,
+      source: "crm",
+      data: crmClient,
+      nivel1Complete: validation.complete,
+      missing: validation.missing,
+      pendingValidation: false,
+    };
+  }
+
+  // 2. Check Google Drive for client folder
+  if (name) {
+    const folderId = await adapters.drive.findClientFolder(name);
+    if (folderId) {
+      console.log(
+        `[Resolver] Pasta encontrada no Drive para "${name}" — criar registo`
+      );
+      const clienteId = await adapters.crm.create({
+        nome_completo: name,
+        telefone_whatsapp: phone,
+        data_primeiro_contacto: new Date().toISOString(),
+      });
+      return {
+        clienteId,
+        source: "drive",
+        data: { nome_completo: name, telefone_whatsapp: phone },
+        nivel1Complete: false,
+        missing: validateNivel1({ nome_completo: name, telefone_whatsapp: phone }).missing,
+        pendingValidation: false,
+      };
+    }
+  }
+
+  // 3. Search ProJuris (legacy CRM)
+  if (name) {
+    const projurisResult = await adapters.projuris.searchClient(name, phone);
+    if (projurisResult) {
+      console.log(
+        `[Resolver] Cliente encontrado no ProJuris: ${projurisResult.projuris_nome}`
+      );
+      const data: Partial<ClienteNivel1> = {
+        nome_completo: projurisResult.projuris_nome,
+        data_nascimento: projurisResult.projuris_data_nascimento,
+        nif: projurisResult.projuris_nif,
+        telefone_whatsapp: projurisResult.projuris_telefone || phone,
+        email: projurisResult.projuris_email,
+        data_primeiro_contacto: new Date().toISOString(),
+      };
+      const clienteId = await adapters.crm.create(data);
+      // ProJuris data ALWAYS requires human validation
+      return {
+        clienteId,
+        source: "projuris",
+        data,
+        nivel1Complete: false,
+        missing: validateNivel1(data).missing,
+        pendingValidation: true, // CRITICAL: must be validated by human
+      };
+    }
+  }
+
+  // 4. New client — create minimal record, start onboarding
+  const clienteId = await adapters.crm.create({
+    telefone_whatsapp: phone,
+    ...(name ? { nome_completo: name } : {}),
+    data_primeiro_contacto: new Date().toISOString(),
+  });
+
+  const partialData: Partial<ClienteNivel1> = {
+    telefone_whatsapp: phone,
+    ...(name ? { nome_completo: name } : {}),
+  };
+
+  return {
+    clienteId,
+    source: "new",
+    data: partialData,
+    nivel1Complete: false,
+    missing: validateNivel1(partialData).missing,
+    pendingValidation: false,
+  };
+}

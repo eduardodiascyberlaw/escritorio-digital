@@ -1,16 +1,14 @@
-version: "3.8"
-
 services:
   # ─────────────────────────────────────────────
   # Paperclip — Orquestração de agentes
   # ─────────────────────────────────────────────
   paperclip:
     image: node:20-alpine
-    working_dir: /app
-    command: sh -c "pnpm install && pnpm start"
+    working_dir: /app/paperclip
+    command: sh -c "corepack enable && corepack prepare pnpm@latest --activate && pnpm install --filter paperclip... && pnpm --filter @sd-legal/shared build && pnpm --filter paperclip build && pnpm --filter paperclip start"
     volumes:
-      - ./paperclip:/app
-      - paperclip_data:/app/data
+      - .:/app
+      - paperclip_data:/app/paperclip/data
     ports:
       - "3100:3100"
     environment:
