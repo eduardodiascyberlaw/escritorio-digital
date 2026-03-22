@@ -7,8 +7,10 @@ import { WebhookHandler } from "./supervised/webhook-handler.js";
 import { VaultReader } from "./obsidian/vault-reader.js";
 import { VaultWriter } from "./obsidian/vault-writer.js";
 import { StubCrmAdapter } from "./client/crm-adapter.js";
+import { HttpCrmAdapter } from "./client/http-crm-adapter.js";
 import { StubPaperclipAdapter } from "./tickets/paperclip-adapter.js";
 import { startHeartbeat } from "./heartbeat/heartbeat.js";
+import type { CrmAdapter } from "./client/crm-adapter.js";
 
 // ─────────────────────────────────────────────
 // Configuração
@@ -33,7 +35,21 @@ const CONTROL_GROUP_NAME =
 const gemini = new GeminiClient(config);
 const vaultReader = new VaultReader(config.obsidianVaultPath);
 const vaultWriter = new VaultWriter(config.obsidianVaultPath);
-const crm = new StubCrmAdapter();
+
+// CRM — usar adapter real se credenciais configuradas, stub caso contrário
+const CRM_EMAIL = process.env.CRM_AG_EMAIL ?? "";
+const CRM_PASSWORD = process.env.CRM_AG_PASSWORD ?? "";
+
+const crm: CrmAdapter = CRM_EMAIL && CRM_PASSWORD
+  ? new HttpCrmAdapter({
+      apiUrl: config.crmApiUrl,
+      email: CRM_EMAIL,
+      password: CRM_PASSWORD,
+    })
+  : new StubCrmAdapter();
+
+console.log(`[Sónia] CRM: ${CRM_EMAIL ? "API real" : "stub (sem credenciais)"}`);
+
 const paperclip = new StubPaperclipAdapter();
 
 const gateway = new EvolutionApiGateway({

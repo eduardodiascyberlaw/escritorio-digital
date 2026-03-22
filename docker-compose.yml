@@ -65,8 +65,9 @@ services:
       - EVOLUTION_INSTANCE=${EVOLUTION_INSTANCE:-sd-legal}
       - CONTROL_GROUP_NAME=${CONTROL_GROUP_NAME:-SD Legal}
       - PAPERCLIP_API_URL=http://paperclip:3100
-      - CRM_AG_API_URL=${CRM_AG_API_URL}
-      - CRM_AG_API_KEY=${CRM_AG_API_KEY}
+      - CRM_AG_API_URL=${CRM_AG_API_URL:-https://plataforma-crm-juridico.klx2s6.easypanel.host}
+      - CRM_AG_EMAIL=${CRM_AG_EMAIL}
+      - CRM_AG_PASSWORD=${CRM_AG_PASSWORD}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
