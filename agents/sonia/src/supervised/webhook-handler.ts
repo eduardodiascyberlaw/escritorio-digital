@@ -5,6 +5,7 @@ import type { VaultReader } from "../obsidian/vault-reader.js";
 import type { VaultWriter } from "../obsidian/vault-writer.js";
 import type { PaperclipAdapter } from "../tickets/paperclip-adapter.js";
 import type { EvolutionApiGateway } from "../gateway/evolution-api.js";
+import { AudioTranscriber } from "../stt/audio-transcriber.js";
 
 import { checkDeontologicalLimits } from "../rules/deontological.js";
 import { DISCLAIMER } from "../llm/prompts.js";
@@ -55,6 +56,7 @@ export class WebhookHandler {
   private vaultWriter: VaultWriter;
   private paperclip: PaperclipAdapter;
   private gateway: EvolutionApiGateway;
+  private transcriber: AudioTranscriber;
   private controlGroupJid: string | null = null;
 
   // Track consent state (in-memory; move to CRM later)
@@ -81,6 +83,7 @@ export class WebhookHandler {
     this.paperclip = deps.paperclip;
     this.gateway = deps.gateway;
     this.controlGroupJid = deps.controlGroupJid;
+    this.transcriber = new AudioTranscriber(deps.gemini);
   }
 
   async handleWebhook(payload: WebhookPayload): Promise<void> {
@@ -104,23 +107,49 @@ export class WebhookHandler {
       return;
     }
 
-    const text = this.extractText(payload.data);
+    let text = this.extractText(payload.data);
+    let isAudioMessage = false;
+
+    // If no text, check for audio message
+    if (!text && payload.data.message?.audioMessage) {
+      const audioMsg = payload.data.message.audioMessage;
+      const mimeType = audioMsg.mimetype ?? "audio/ogg";
+      const messageId = payload.data.key.id;
+
+      console.log(`[Webhook] 🎤 Áudio recebido de ${pushName ?? phone} (${mimeType})`);
+
+      // Download audio from Evolution API
+      const audioBuffer = await this.downloadMedia(messageId);
+      if (audioBuffer) {
+        text = await this.transcriber.transcribe(audioBuffer, mimeType);
+        isAudioMessage = true;
+      }
+
+      if (!text) {
+        console.log(`[Webhook] Áudio não transcrito de ${phone}`);
+        return;
+      }
+    }
+
     if (!text) {
-      console.log(`[Webhook] Mensagem sem texto de ${phone} — ignorar`);
+      console.log(`[Webhook] Mensagem sem conteúdo de ${phone} — ignorar`);
       return;
     }
 
     console.log(
-      `[Webhook] ← ${pushName ?? phone}: ${text.substring(0, 60)}...`
+      `[Webhook] ← ${pushName ?? phone}${isAudioMessage ? " 🎤" : ""}: ${text.substring(0, 60)}...`
     );
 
     // Process the message and generate a draft response
     try {
-      const { response, context } = await this.processMessage(
+      const { response, context: baseContext } = await this.processMessage(
         phone,
         pushName,
         text
       );
+      const context = isAudioMessage
+        ? `🎤 Áudio transcrito: "${text.substring(0, 100)}${text.length > 100 ? "..." : ""}"\n${baseContext}`
+        : baseContext;
 
       // Submit draft for human approval
       await this.supervised.submitDraft(
@@ -277,6 +306,42 @@ Não uses emojis em excesso. Não dês pareceres jurídicos.`,
       data.message?.imageMessage?.caption ??
       null
     );
+  }
+
+  private async downloadMedia(messageId: string): Promise<Buffer | null> {
+    try {
+      const instance = process.env.EVOLUTION_INSTANCE ?? "sd-legal";
+      const apiUrl = process.env.EVOLUTION_API_URL ?? "http://localhost:8080";
+      const apiKey = process.env.EVOLUTION_API_KEY ?? "";
+
+      // Evolution API v2: download media by message ID
+      const res = await fetch(
+        `${apiUrl}/chat/getBase64FromMediaMessage/${instance}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: apiKey,
+          },
+          body: JSON.stringify({
+            message: { key: { id: messageId } },
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        console.error(`[Webhook] Download media falhou: ${res.status}`);
+        return null;
+      }
+
+      const data = (await res.json()) as { base64?: string };
+      if (!data.base64) return null;
+
+      return Buffer.from(data.base64, "base64");
+    } catch (error) {
+      console.error("[Webhook] Erro ao descarregar media:", error);
+      return null;
+    }
   }
 
   private jidToPhone(jid: string): string {
