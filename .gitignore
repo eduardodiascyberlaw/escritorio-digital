@@ -1,0 +1,52 @@
+# Dependências
+node_modules/
+.pnpm-store/
+
+# Ambiente
+.env
+.env.local
+.env.production
+
+# Build
+dist/
+build/
+*.tsbuildinfo
+
+# Runtime
+*.log
+logs/
+pids/
+*.pid
+*.seed
+
+# Docker volumes locais
+paperclip_data/
+paperclip_db_data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Google Cloud — ADC credentials (nunca commitar)
+application_default_credentials.json
+gcloud/
+
+# Obsidian — cache local
+obsidian-vault/.obsidian/workspace.json
+obsidian-vault/.obsidian/workspace-mobile.json
+obsidian-vault/.trash/
+
+# Playwright
+playwright-report/
+test-results/
+
+# Coverage
+coverage/
+.nyc_output/

@@ -1,0 +1,52 @@
+version: "3.8"
+
+services:
+  # ─────────────────────────────────────────────
+  # Paperclip — Orquestração de agentes
+  # ─────────────────────────────────────────────
+  paperclip:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "pnpm install && pnpm start"
+    volumes:
+      - ./paperclip:/app
+      - paperclip_data:/app/data
+    ports:
+      - "3100:3100"
+    environment:
+      - DATABASE_URL=postgresql://paperclip:${PAPERCLIP_DB_PASSWORD}@paperclip_db:5432/paperclip
+      - NODE_ENV=production
+    depends_on:
+      paperclip_db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sd-legal
+
+  # ─────────────────────────────────────────────
+  # PostgreSQL — Base de dados do Paperclip
+  # ─────────────────────────────────────────────
+  paperclip_db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=paperclip
+      - POSTGRES_PASSWORD=${PAPERCLIP_DB_PASSWORD}
+      - POSTGRES_DB=paperclip
+    volumes:
+      - paperclip_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paperclip -d paperclip"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - sd-legal
+
+volumes:
+  paperclip_data:
+  paperclip_db_data:
+
+networks:
+  sd-legal:
+    driver: bridge
