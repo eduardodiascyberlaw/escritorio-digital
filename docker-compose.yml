@@ -41,6 +41,38 @@ services:
     networks:
       - sd-legal
 
+  # ─────────────────────────────────────────────
+  # Sónia — Agente Recepcionista (modo supervisionado)
+  # ─────────────────────────────────────────────
+  sonia:
+    image: node:20-alpine
+    working_dir: /app/agents/sonia
+    command: sh -c "corepack enable && corepack prepare pnpm@latest --activate && cd /app && pnpm install --filter @sd-legal/sonia... && pnpm --filter @sd-legal/shared build && pnpm --filter @sd-legal/sonia build && pnpm --filter @sd-legal/sonia start"
+    volumes:
+      - .:/app
+      - /root/.config/gcloud:/root/.config/gcloud:ro
+    ports:
+      - "3101:3101"
+    environment:
+      - NODE_ENV=production
+      - SONIA_PORT=3101
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-514934487167}
+      - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-europe-west4}
+      - GEMINI_MODEL_FLASH=${GEMINI_MODEL_FLASH:-gemini-2.5-flash}
+      - OBSIDIAN_VAULT_PATH=/app/obsidian-vault
+      - EVOLUTION_API_URL=http://host.docker.internal:8080
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
+      - EVOLUTION_INSTANCE=${EVOLUTION_INSTANCE:-sd-legal}
+      - CONTROL_GROUP_NAME=${CONTROL_GROUP_NAME:-SD Legal}
+      - PAPERCLIP_API_URL=http://paperclip:3100
+      - CRM_AG_API_URL=${CRM_AG_API_URL}
+      - CRM_AG_API_KEY=${CRM_AG_API_KEY}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    networks:
+      - sd-legal
+
 volumes:
   paperclip_data:
   paperclip_db_data:
