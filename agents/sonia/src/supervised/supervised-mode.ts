@@ -1,4 +1,5 @@
 import type { EvolutionApiGateway } from "../gateway/evolution-api.js";
+import type { ElevenLabsTts } from "../tts/elevenlabs-tts.js";
 
 export interface PendingDraft {
   id: string;
@@ -13,15 +14,18 @@ export interface PendingDraft {
 export class SupervisedMode {
   private pendingDrafts = new Map<string, PendingDraft>();
   private gateway: EvolutionApiGateway;
+  private tts: ElevenLabsTts | null;
   private controlGroupJid: string | null = null;
   private controlGroupName: string;
 
   constructor(
     gateway: EvolutionApiGateway,
-    controlGroupName: string = "SD Legal"
+    controlGroupName: string = "SD Legal",
+    tts: ElevenLabsTts | null = null
   ) {
     this.gateway = gateway;
     this.controlGroupName = controlGroupName;
+    this.tts = tts;
   }
 
   async initialize(): Promise<void> {
@@ -115,6 +119,16 @@ export class SupervisedMode {
       return { action: "unknown" };
     }
 
+    // AUDIO [id] — approve and send as text + audio
+    const audioMatch = text.match(/^AUDIO\s*(\S*)/i);
+    if (audioMatch) {
+      const draftId = audioMatch[1] || this.getMostRecentDraft()?.id;
+      if (draftId) {
+        return this.approveDraftWithAudio(draftId);
+      }
+      return { action: "unknown" };
+    }
+
     // IGNORAR [id] — discard draft
     const ignorarMatch = text.match(/^IGNORAR\s*(\S*)/i);
     if (ignorarMatch) {
@@ -154,6 +168,41 @@ export class SupervisedMode {
     console.log(
       `[Supervisionado] Rascunho ${draftId} aprovado e enviado a ${draft.clientPhone}`
     );
+
+    return { action: "sent", draftId };
+  }
+
+  private async approveDraftWithAudio(
+    draftId: string
+  ): Promise<{ action: "sent" | "unknown"; draftId?: string }> {
+    const draft = this.pendingDrafts.get(draftId);
+    if (!draft) {
+      console.warn(`[Supervisionado] Rascunho ${draftId} não encontrado`);
+      return { action: "unknown" };
+    }
+
+    // Send text first
+    await this.gateway.sendMessage(draft.clientPhone, draft.proposedResponse);
+
+    // Generate and send audio
+    if (this.tts?.isEnabled()) {
+      const audio = await this.tts.textToSpeech(draft.proposedResponse);
+      if (audio) {
+        await this.gateway.sendAudio(draft.clientPhone, audio);
+        console.log(`[Supervisionado] Áudio enviado a ${draft.clientPhone}`);
+      }
+    } else {
+      console.log("[Supervisionado] TTS não disponível — só texto enviado");
+    }
+
+    this.pendingDrafts.delete(draftId);
+
+    if (this.controlGroupJid) {
+      await this.gateway.sendToGroup(
+        this.controlGroupJid,
+        `✅🔊 Resposta ${draftId} enviada (texto + áudio) a ${draft.clientName ?? draft.clientPhone}`
+      );
+    }
 
     return { action: "sent", draftId };
   }
@@ -208,7 +257,8 @@ ${draft.proposedResponse}
 ━━━━━━━━━━━━━━━━━━━━
 🆔 *${draft.id}*
 
-→ *ENVIAR ${draft.id}* para aprovar
+→ *ENVIAR ${draft.id}* para aprovar (texto)
+→ *AUDIO ${draft.id}* para aprovar (texto + áudio)
 → *EDITAR ${draft.id}* seguido do novo texto
 → *IGNORAR ${draft.id}* para descartar`;
   }

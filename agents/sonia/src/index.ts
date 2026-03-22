@@ -10,6 +10,7 @@ import { StubCrmAdapter } from "./client/crm-adapter.js";
 import { HttpCrmAdapter } from "./client/http-crm-adapter.js";
 import { StubPaperclipAdapter } from "./tickets/paperclip-adapter.js";
 import { startHeartbeat } from "./heartbeat/heartbeat.js";
+import { ElevenLabsTts } from "./tts/elevenlabs-tts.js";
 import type { CrmAdapter } from "./client/crm-adapter.js";
 
 // ─────────────────────────────────────────────
@@ -58,7 +59,13 @@ const gateway = new EvolutionApiGateway({
   instanceName: EVOLUTION_INSTANCE,
 });
 
-const supervised = new SupervisedMode(gateway, CONTROL_GROUP_NAME);
+// TTS — ElevenLabs
+const tts = new ElevenLabsTts({
+  apiKey: config.elevenlabsApiKey,
+  voiceId: config.elevenlabsVoiceId,
+});
+
+const supervised = new SupervisedMode(gateway, CONTROL_GROUP_NAME, tts);
 
 // ─────────────────────────────────────────────
 // Servidor HTTP (recebe webhooks da Evolution API)
