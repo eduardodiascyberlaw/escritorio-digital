@@ -48,6 +48,27 @@ export type Materia =
 
 export type UrgenciaProcessual = "cautelar" | "prazo_curto" | "normal";
 
+export type ServicoTipo =
+  | "pedido_ar"
+  | "renovacao_ar"
+  | "nacionalidade_pt"
+  | "emissao_nif"
+  | "constituicao_empresa"
+  | "abertura_actividade"
+  | "processo_laboral"
+  | "recurso_ar_indeferida"
+  | "suspensao_saida_voluntaria"
+  | "casamento_portugal"
+  | "casamento_brasil"
+  | "divorcio_portugal"
+  | "divorcio_brasil"
+  | "revisao_sentenca_pt"
+  | "homologacao_sentenca_br"
+  | "injuncao_pagamento"
+  | "insolvencia_empresa"
+  | "insolvencia_pessoal"
+  | "outro";
+
 export interface AuditEntry {
   timestamp: string;
   agente: AgentId;
