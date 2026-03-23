@@ -25,18 +25,51 @@ export type MessageIntent =
 
 export type IntentCategory = "conversa" | "triagem";
 
+export type DetectedLanguage = "pt" | "en" | "fr" | "cv";
+
 export interface IntentResult {
   intent: MessageIntent;
   category: IntentCategory;
   confidence: "alta" | "media";
+  language?: DetectedLanguage;
 }
 
 // ─── Padroes rapidos (sem LLM) ───
 
-const GREETING_PATTERNS = [
-  /^(oi|ol[aá]|hey|hi|hello|bom\s*dia|boa\s*(tarde|noite)|e\s*a[ií]|tudo\s*bem|como\s*(vai|est[aá]|vão))/i,
-  /^(salut|bonjour|bonsoir)/i,
+// Saudacoes por lingua — ordem importa: linguas mais especificas primeiro
+const GREETING_PATTERNS_FR = [
+  /^(bonjour|bonsoir|salut|comment\s*(allez|vas|ça\s*va))/i,
 ];
+
+const GREETING_PATTERNS_EN = [
+  /^(hi|hello|hey|good\s*(morning|afternoon|evening)|how\s*(are\s*you|do\s*you\s*do))/i,
+];
+
+const GREETING_PATTERNS_CV = [
+  /^(modi\s*ki\s*bu\s*sta|bu\s*sta\s*bon|boa\s*noti|bon\s*dia)/i,
+];
+
+const GREETING_PATTERNS_PT = [
+  /^(oi|ol[aá]|bom\s*dia|boa\s*(tarde|noite)|e\s*a[ií]|tudo\s*bem|como\s*(vai|est[aá]|vão))/i,
+];
+
+// Agregado (para checks que so precisam saber se e saudacao, sem importar a lingua)
+const GREETING_PATTERNS = [
+  ...GREETING_PATTERNS_FR,
+  ...GREETING_PATTERNS_EN,
+  ...GREETING_PATTERNS_CV,
+  ...GREETING_PATTERNS_PT,
+];
+
+/** Detecta lingua a partir de padroes de saudacao. */
+function detectGreetingLanguage(text: string): DetectedLanguage | null {
+  const trimmed = text.trim();
+  for (const p of GREETING_PATTERNS_FR) if (p.test(trimmed)) return "fr";
+  for (const p of GREETING_PATTERNS_EN) if (p.test(trimmed)) return "en";
+  for (const p of GREETING_PATTERNS_CV) if (p.test(trimmed)) return "cv";
+  for (const p of GREETING_PATTERNS_PT) if (p.test(trimmed)) return "pt";
+  return null;
+}
 
 const THANKS_PATTERNS = [
   /^(obrigad[oa]|valeu|agradec|thank|merci|muito\s*obrigad)/i,
@@ -81,6 +114,10 @@ function detectByPattern(text: string): IntentResult | null {
 
   // Mensagens muito curtas (< 15 chars) que sejam saudacao
   if (trimmed.length < 15) {
+    const lang = detectGreetingLanguage(trimmed);
+    if (lang) {
+      return { intent: "saudacao", category: "conversa", confidence: "alta", language: lang };
+    }
     for (const pattern of GREETING_PATTERNS) {
       if (pattern.test(trimmed)) {
         return { intent: "saudacao", category: "conversa", confidence: "alta" };
@@ -94,12 +131,21 @@ function detectByPattern(text: string): IntentResult | null {
   }
 
   // Saudacoes mais longas (ex: "bom dia, tudo bem?")
+  const lang = detectGreetingLanguage(trimmed);
+  if (lang && trimmed.length < 60) {
+    // Se tambem tem padrao de caso, e triagem
+    for (const casePattern of CASE_PATTERNS) {
+      if (casePattern.test(trimmed)) {
+        return null; // ambiguo — delegar ao LLM
+      }
+    }
+    return { intent: "saudacao", category: "conversa", confidence: "alta", language: lang };
+  }
   for (const pattern of GREETING_PATTERNS) {
     if (pattern.test(trimmed) && trimmed.length < 60) {
-      // Se tambem tem padrao de caso, e triagem
       for (const casePattern of CASE_PATTERNS) {
         if (casePattern.test(trimmed)) {
-          return null; // ambiguo — delegar ao LLM
+          return null;
         }
       }
       return { intent: "saudacao", category: "conversa", confidence: "alta" };
@@ -153,12 +199,13 @@ const INTENT_PROMPT = buildPrompt(
 - "reclamacao" — reclamacao sobre o escritorio ou servico
 
 Responde EXCLUSIVAMENTE em JSON:
-{ "intent": string, "category": "conversa" | "triagem" }`
+{ "intent": string, "category": "conversa" | "triagem", "language": "pt" | "en" | "fr" | "cv" }`
 );
 
 interface LlmIntentResult {
   intent: MessageIntent;
   category: IntentCategory;
+  language?: DetectedLanguage;
 }
 
 async function detectByLlm(
@@ -176,6 +223,7 @@ async function detectByLlm(
       intent: result.intent ?? "conversa_geral",
       category: result.category ?? "conversa",
       confidence: "media",
+      language: result.language,
     };
   } catch {
     // Em caso de erro, tratar como conversa (mais seguro que criar ticket errado)
@@ -204,16 +252,18 @@ export async function detectIntent(
 ): Promise<IntentResult> {
   const patternResult = detectByPattern(text);
   if (patternResult) {
+    const langTag = patternResult.language ? ` [${patternResult.language}]` : "";
     console.log(
-      `[Intent] Padrao: ${patternResult.intent} (${patternResult.category}) — "${text.substring(0, 40)}..."`
+      `[Intent] Padrao: ${patternResult.intent} (${patternResult.category})${langTag} — "${text.substring(0, 40)}..."`
     );
     return patternResult;
   }
 
   console.log(`[Intent] Ambiguo — usando LLM para: "${text.substring(0, 40)}..."`);
   const llmResult = await detectByLlm(text, clientName, gemini);
+  const langTag = llmResult.language ? ` [${llmResult.language}]` : "";
   console.log(
-    `[Intent] LLM: ${llmResult.intent} (${llmResult.category})`
+    `[Intent] LLM: ${llmResult.intent} (${llmResult.category})${langTag}`
   );
   return llmResult;
 }

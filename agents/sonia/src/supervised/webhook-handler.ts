@@ -26,7 +26,7 @@ import { escalateToHuman } from "../escalation/escalation.js";
 import type { ChamadoHumano } from "../escalation/types.js";
 import { StubProJurisAdapter } from "../client/projuris-adapter.js";
 import { StubDriveAdapter } from "../client/drive-adapter.js";
-import { detectIntent, hasStatusIntent } from "../conversation/intent-detector.js";
+import { detectIntent, hasStatusIntent, type DetectedLanguage } from "../conversation/intent-detector.js";
 import { CONVERSATION_PROMPT } from "../llm/prompts.js";
 import type { ConversationMemory } from "../conversation/conversation-memory.js";
 import { MessageBatcher } from "../conversation/message-batcher.js";
@@ -259,6 +259,21 @@ export class WebhookHandler {
     }
   }
 
+  private static LANGUAGE_NAMES: Record<string, string> = {
+    pt: "português",
+    en: "inglês",
+    fr: "francês",
+    cv: "crioulo cabo-verdiano",
+  };
+
+  /** Constroi instrucao de lingua para injectar no prompt do Gemini. */
+  private buildLanguageInstruction(phone: string): string {
+    const lang = this.memory.getLanguage(phone);
+    if (!lang || lang === "pt") return "";
+    const name = WebhookHandler.LANGUAGE_NAMES[lang] ?? lang;
+    return `\n\nIDIOMA DO CLIENTE: O cliente comunica em ${name}. Responde SEMPRE em ${name}.`;
+  }
+
   private async processMessage(
     phone: string,
     name: string | null,
@@ -362,9 +377,10 @@ REGRAS:
 - Nao des pareceres juridicos.${rgpdInstruction}`
       );
 
+      const onboardingLangInstruction = this.buildLanguageInstruction(phone);
       const response = await this.gemini.generateText(
         onboardingPrompt,
-        `Nome do cliente: ${name ?? "desconhecido"}\nMensagem: "${text}"\nDados ja recolhidos: ${JSON.stringify(resolved.data, null, 2)}${historyContext}`
+        `Nome do cliente: ${name ?? "desconhecido"}\nMensagem: "${text}"\nDados ja recolhidos: ${JSON.stringify(resolved.data, null, 2)}${historyContext}${onboardingLangInstruction}`
       );
 
       return {
@@ -376,6 +392,12 @@ REGRAS:
     // 5. Detect intent — conversa ou triagem?
     const intent = await detectIntent(text, name, this.gemini);
 
+    // Registar lingua detectada (se presente)
+    if (intent.language) {
+      this.memory.setLanguage(phone, intent.language);
+    }
+    const langInstruction = this.buildLanguageInstruction(phone);
+
     // 5a. Conversa — responder naturalmente, sem criar ticket
     if (intent.category === "conversa") {
       // Detectar saudacao que tambem pede novidades/status
@@ -385,7 +407,7 @@ REGRAS:
         // Auto-enviar acknowledgment directo ao cliente (sem aprovacao)
         const ackResponse = await this.gemini.generateText(
           CONVERSATION_PROMPT,
-          `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem: "${text}"${historyContext}\n\nINSTRUCAO ESPECIAL: O cliente quer saber novidades. Responde com um cumprimento caloroso e diz que vais verificar o estado do processo. NAO inventes informacao — diz apenas que vais consultar e que voltas ja.`
+          `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem: "${text}"${historyContext}${langInstruction}\n\nINSTRUCAO ESPECIAL: O cliente quer saber novidades. Responde com um cumprimento caloroso e diz que vais verificar o estado do processo. NAO inventes informacao — diz apenas que vais consultar e que voltas ja.`
         );
 
         await this.gateway.sendMessage(phone, ackResponse);
@@ -417,7 +439,7 @@ REGRAS:
 
           const followUpResponse = await this.gemini.generateText(
             CONVERSATION_PROMPT,
-            `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem original: "${text}"\n\nINFORMACAO DO CRM (apresentar de forma acessivel, sem jargao — nunca mostrar IDs nem dados internos):\n${info}\n\nINSTRUCAO ESPECIAL: Ja cumprimentaste o cliente na mensagem anterior e disseste que ias verificar. Agora apresenta as novidades do processo de forma clara e acessivel. Nao repitas o cumprimento.${historyContext}`
+            `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem original: "${text}"\n\nINFORMACAO DO CRM (apresentar de forma acessivel, sem jargao — nunca mostrar IDs nem dados internos):\n${info}\n\nINSTRUCAO ESPECIAL: Ja cumprimentaste o cliente na mensagem anterior e disseste que ias verificar. Agora apresenta as novidades do processo de forma clara e acessivel. Nao repitas o cumprimento.${historyContext}${langInstruction}`
           );
 
           return {
@@ -446,7 +468,7 @@ REGRAS:
       // Conversa normal (saudacao, agradecimento, conversa_geral)
       const response = await this.gemini.generateText(
         CONVERSATION_PROMPT,
-        `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem: "${text}"${historyContext}`
+        `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem: "${text}"${historyContext}${langInstruction}`
       );
 
       return {
@@ -490,7 +512,7 @@ REGRAS:
     // Gerar resposta conversacional (mesmo na triagem, ser humana)
     const response = await this.gemini.generateText(
       CONVERSATION_PROMPT,
-      `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem: "${text}"\n\nCONTEXTO INTERNO (nao mencionar ao cliente): O caso foi registado como ${classification.classificacao.area} / ${classification.classificacao.sub_tipo}. A equipa vai analisar.${historyContext}`
+      `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem: "${text}"\n\nCONTEXTO INTERNO (nao mencionar ao cliente): O caso foi registado como ${classification.classificacao.area} / ${classification.classificacao.sub_tipo}. A equipa vai analisar.${historyContext}${langInstruction}`
     );
 
     return {

@@ -18,10 +18,25 @@ export interface ConversationEntry {
 
 export class ConversationMemory {
   private store = new Map<string, ConversationEntry[]>();
+  private languages = new Map<string, string>();
   private maxPerClient: number;
 
   constructor(maxPerClient = 20) {
     this.maxPerClient = maxPerClient;
+  }
+
+  /** Regista a lingua detectada para um cliente. So actualiza se a nova lingua for diferente de "pt" ou se nao houver lingua registada. */
+  setLanguage(phone: string, language: string): void {
+    const current = this.languages.get(phone);
+    // Primeira deteccao ou lingua nao-portuguesa detectada (mais forte que default pt)
+    if (!current || language !== "pt") {
+      this.languages.set(phone, language);
+    }
+  }
+
+  /** Retorna a lingua detectada para um cliente, ou null se desconhecida. */
+  getLanguage(phone: string): string | null {
+    return this.languages.get(phone) ?? null;
   }
 
   /** Adiciona entrada ao historico. Trunca automaticamente a maxPerClient. */
