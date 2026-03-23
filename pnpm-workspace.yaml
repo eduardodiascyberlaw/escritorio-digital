@@ -2,3 +2,4 @@ packages:
   - "paperclip"
   - "agents/*"
   - "shared"
+  - "apps/*"

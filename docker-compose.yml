@@ -74,9 +74,37 @@ services:
     networks:
       - sd-legal
 
+  # ─────────────────────────────────────────────
+  # Dashboard Visual (Fase 6)
+  # ─────────────────────────────────────────────
+  dashboard:
+    build:
+      context: ./apps/dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "3200:3200"
+    environment:
+      - DASHBOARD_PORT=3200
+      - DASHBOARD_BROADCAST_KEY=${DASHBOARD_BROADCAST_KEY}
+      - DASHBOARD_DOMAIN=${DASHBOARD_DOMAIN}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - USERS_FILE=/etc/sd-legal/dashboard-users.json
+      - DASHBOARD_PASS_EDUARDO=${DASHBOARD_PASS_EDUARDO}
+      - DASHBOARD_PASS_CAROLINA=${DASHBOARD_PASS_CAROLINA}
+      - DASHBOARD_PASS_ANA=${DASHBOARD_PASS_ANA}
+      - DASHBOARD_PASS_MARIANA=${DASHBOARD_PASS_MARIANA}
+      - DASHBOARD_PASS_SILVIA=${DASHBOARD_PASS_SILVIA}
+      - NODE_ENV=production
+    volumes:
+      - dashboard_users:/etc/sd-legal
+    restart: unless-stopped
+    networks:
+      - sd-legal
+
 volumes:
   paperclip_data:
   paperclip_db_data:
+  dashboard_users:
 
 networks:
   sd-legal:

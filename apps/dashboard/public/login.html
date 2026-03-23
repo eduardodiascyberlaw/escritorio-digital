@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SD Legal — Acesso</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#05050f;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:'Courier New',monospace}
+    .card{background:#0a0a1c;border:1.5px solid #1e3a6a;border-radius:8px;padding:40px 36px;width:340px}
+    .logo{text-align:center;margin-bottom:28px}
+    .logo-icon{font-size:36px;display:block;margin-bottom:10px}
+    .logo h1{color:#60a5fa;font-size:13px;letter-spacing:3px;font-weight:normal}
+    .logo p{color:#3a5a8a;font-size:9px;letter-spacing:2px;margin-top:4px}
+    hr{border:none;border-top:0.5px solid #181838;margin:0 0 24px}
+    label{display:block;font-size:9px;color:#3a5a8a;letter-spacing:2px;margin-bottom:6px}
+    input{width:100%;background:#050510;border:1px solid #1a2a40;border-radius:4px;color:#88aacc;font-family:'Courier New',monospace;font-size:13px;padding:10px 12px;margin-bottom:16px;outline:none;transition:border-color .2s}
+    input:focus{border-color:#3a6aaa}
+    button{width:100%;background:#0c2040;color:#60a5fa;border:1px solid #1a4a80;border-radius:4px;font-family:'Courier New',monospace;font-size:11px;letter-spacing:2px;padding:12px;cursor:pointer;transition:background .2s}
+    button:hover{background:#142850}
+    .error{background:#1c0808;border:1px solid #4a1a1a;border-radius:4px;color:#e04040;font-size:9px;letter-spacing:1px;padding:10px 12px;margin-bottom:16px;text-align:center}
+    .footer{text-align:center;margin-top:20px;font-size:8px;color:#1e2e4a;letter-spacing:1px}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <span class="logo-icon">&#9878;</span>
+      <h1>SD LEGAL</h1>
+      <p>ESCRITORIO DIGITAL</p>
+    </div>
+    <hr>
+    <div class="error" id="err" style="display:none"></div>
+    <form method="POST" action="/auth/login">
+      <label for="u">UTILIZADOR</label>
+      <input type="text" id="u" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus required>
+      <label for="p">PASSWORD</label>
+      <input type="password" id="p" name="password" autocomplete="current-password" required>
+      <button type="submit">ENTRAR</button>
+    </form>
+    <p class="footer">SOUSA &amp; DIAS ADVOGADOS</p>
+  </div>
+  <script>
+    const e=new URLSearchParams(location.search).get('error');
+    const el=document.getElementById('err');
+    if(e==='invalid'){el.textContent='UTILIZADOR OU PASSWORD INCORRECTOS';el.style.display='block';}
+    else if(e==='empty'){el.textContent='PREENCHA TODOS OS CAMPOS';el.style.display='block';}
+  </script>
+</body>
+</html>

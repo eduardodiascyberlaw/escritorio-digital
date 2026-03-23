@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SD Legal — Escritorio Digital</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#05050f;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding-top:16px;font-family:'Courier New',monospace;color:#88aacc}
+    #user-bar{width:700px;display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:#0a0a1c;border:1px solid #181838;border-radius:6px;margin-bottom:8px}
+    #user-bar .title{font-size:9px;color:#3a6a9a;letter-spacing:1px}
+    #user-bar .right{display:flex;gap:12px;align-items:center}
+    #user-name{font-size:9px;color:#60a5fa}
+    .btn-logout{background:#100808;color:#884444;border:1px solid #2a1414;border-radius:3px;font-family:'Courier New',monospace;font-size:8px;padding:3px 8px;cursor:pointer;letter-spacing:1px}
+    .btn-logout:hover{background:#1a0c0c}
+    #office-wrap{position:relative;width:700px}
+    canvas{display:block;border:1px solid #1a2a40;border-radius:4px;background:#080814}
+    #chatbox{display:none;flex-direction:column;position:absolute;top:8px;right:8px;width:200px;height:260px;background:#0a0a1cee;border:1px solid #1e3a6a;border-radius:6px;overflow:hidden;z-index:10}
+    #chat-header{font-size:8px;color:#3a6a9a;letter-spacing:2px;padding:6px 8px;border-bottom:1px solid #181838;text-align:center}
+    #chat-msgs{flex:1;overflow-y:auto;padding:6px 8px;font-size:9px;line-height:1.5}
+    #chat-msgs::-webkit-scrollbar{width:3px}
+    #chat-msgs::-webkit-scrollbar-thumb{background:#1a2a40;border-radius:2px}
+    #chat-msgs .msg{margin-bottom:4px;word-wrap:break-word}
+    #stats-bar{width:700px;display:flex;gap:16px;padding:6px 10px;margin-top:6px;background:#0a0a1c;border:1px solid #181838;border-radius:4px;font-size:8px;color:#2a4a6a;letter-spacing:1px}
+    #stats-bar .stat{display:flex;gap:4px}
+    #stats-bar .val{color:#4a7aaa}
+    #controls{width:700px;display:flex;gap:8px;align-items:flex-start;margin-top:6px}
+    #btn-meeting{background:#0c1428;color:#4a7aaa;border:1px solid #1a2a50;border-radius:4px;font-family:'Courier New',monospace;font-size:9px;letter-spacing:1px;padding:6px 12px;cursor:pointer}
+    #btn-meeting:hover{background:#101a30;color:#60a5fa}
+    #meeting-panel{display:none;background:#0a0a1c;border:1px solid #1e3a6a;border-radius:6px;padding:10px 14px}
+    #meeting-panel label{display:block;font-size:9px;color:#4a7aaa;margin:3px 0;cursor:pointer}
+    #meeting-panel label:hover{color:#60a5fa}
+    #meeting-panel input[type=checkbox]{margin-right:6px;accent-color:#3b82f6}
+    #btn-start-meet{margin-top:8px;background:#0c2040;color:#60a5fa;border:1px solid #1a4a80;border-radius:3px;font-family:'Courier New',monospace;font-size:8px;letter-spacing:1px;padding:5px 10px;cursor:pointer;width:100%}
+    #btn-start-meet:hover{background:#142850}
+    #status-bar{width:700px;padding:5px 10px;margin-top:6px;background:#0a0a1c;border:1px solid #181838;border-radius:4px;font-size:8px;color:#2a5a3a;letter-spacing:1px;min-height:22px}
+    .hud-label{font-size:7px;color:#1e3e5e;margin-right:2px}
+  </style>
+</head>
+<body>
+  <!-- User bar -->
+  <div id="user-bar">
+    <span class="title">SD LEGAL — ESCRITORIO DIGITAL</span>
+    <div class="right">
+      <span id="user-name"></span>
+      <form method="POST" action="/auth/logout" style="margin:0">
+        <button type="submit" class="btn-logout">SAIR</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Canvas + chat overlay -->
+  <div id="office-wrap">
+    <canvas id="office" width="700" height="460"></canvas>
+    <div id="chatbox">
+      <div id="chat-header">SALA DE REUNIAO</div>
+      <div id="chat-msgs"></div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div id="stats-bar">
+    <div class="stat"><span class="hud-label">PROC</span><span class="val" id="s-proc">0</span></div>
+    <div class="stat"><span class="hud-label">TICK</span><span class="val" id="s-tick">0</span></div>
+    <div class="stat"><span class="hud-label">MSG</span><span class="val" id="s-msg">0</span></div>
+    <div class="stat"><span class="hud-label">PEC</span><span class="val" id="s-pec">0</span></div>
+    <div class="stat"><span class="hud-label">CLI</span><span class="val" id="s-cli">0</span></div>
+  </div>
+
+  <!-- Controls -->
+  <div id="controls">
+    <button id="btn-meeting">CONVOCAR REUNIAO</button>
+    <div id="meeting-panel">
+      <label><input type="checkbox" value="sonia" checked> Sonia</label>
+      <label><input type="checkbox" value="rex" checked> Rex</label>
+      <label><input type="checkbox" value="iris"> Iris</label>
+      <label><input type="checkbox" value="lex"> Lex</label>
+      <label><input type="checkbox" value="nova"> Nova</label>
+      <button id="btn-start-meet">INICIAR REUNIAO</button>
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div id="status-bar"><span id="status">A inicializar...</span></div>
+
+<script>
+// ── CANVAS SETUP ──────────────────────────────────────────────────────────
+const cv = document.getElementById('office');
+const ctx = cv.getContext('2d');
+const W = 700, H = 460;
+
+// ── PALETTE ───────────────────────────────────────────────────────────────
+const PAL = {
+  bg:'#080814', wall:'#1a2a40', wallH:'#1e3a6a', floor:'#0b0b18',
+  corridor:'#0a0a16', text:'#1e3e5e', textH:'#3a6a9a', desk:'#0e0e1c',
+  deskBord:'#181830',
+};
+
+const ACOL = {
+  sonia:'#a855f7', rex:'#3b82f6', iris:'#22c55e', lex:'#eab308', nova:'#f97316'
+};
+const ABODY = {
+  sonia:'#7c3aed', rex:'#2563eb', iris:'#16a34a', lex:'#ca8a04', nova:'#ea580c'
+};
+const ANAMES = {
+  sonia:'SONIA', rex:'REX', iris:'IRIS', lex:'LEX', nova:'NOVA'
+};
+
+// ── OFFICE LAYOUT ─────────────────────────────────────────────────────────
+const ROOMS = [
+  {id:'meet', x:4,  y:4,  w:126, h:170, label:'REUNIAO',    col:'#0c1428'},
+  {id:'server',x:570,y:4,  w:126, h:170, label:'SERVIDOR',   col:'#0c1420'},
+  {id:'crm',  x:4,  y:286, w:126, h:170, label:'CRM',        col:'#0c1c14'},
+  {id:'lexc', x:570,y:286, w:126, h:170, label:'LEX CORPUS', col:'#14120c'},
+];
+
+const DESKS = [
+  {id:'sonia', x:152, y:30,  w:88, h:85},
+  {id:'rex',   x:252, y:30,  w:88, h:85},
+  {id:'iris',  x:352, y:30,  w:88, h:85},
+  {id:'lex',   x:452, y:30,  w:88, h:85},
+  {id:'nova',  x:152, y:320, w:88, h:85},
+];
+
+const CORRIDOR_Y = 228; // center of corridor for pathfinding
+const CORRIDOR_TOP = 180;
+const CORRIDOR_BOT = 280;
+
+// ── TARGETS (room interior positions) ────────────────────────────────────
+const TARGETS = {
+  meet: {x:67, y:90},
+  crm:  {x:67, y:370},
+  lexc: {x:633,y:370},
+  server:{x:633,y:90},
+};
+
+// Meeting chair positions around the table
+const MEET_SEATS = [
+  {x:37,y:60},{x:67,y:55},{x:97,y:60},
+  {x:37,y:120},{x:67,y:125},{x:97,y:120},
+];
+
+// ── AGENTS ────────────────────────────────────────────────────────────────
+const AG = {};
+['sonia','rex','iris','lex','nova'].forEach(id => {
+  const d = DESKS.find(d => d.id === id);
+  const hx = d.x + d.w/2, hy = d.y + d.h/2 + 10;
+  AG[id] = {
+    x:hx, y:hy, hx:hx, hy:hy,
+    path:[], busy:false, frame:0,
+    state:'idle', task:'',
+  };
+});
+
+const SPD = 1.8;
+
+// ── PATHFINDING ───────────────────────────────────────────────────────────
+function buildPath(from, to) {
+  const pts = [];
+  const fy = from.y, ty = to.y;
+  // If source is in a room (not in corridor), step to corridor first
+  if (fy < CORRIDOR_TOP || fy > CORRIDOR_BOT) {
+    pts.push({x:from.x, y:CORRIDOR_Y});
+  }
+  // Walk along corridor to target X
+  if (to.y < CORRIDOR_TOP || to.y > CORRIDOR_BOT) {
+    pts.push({x:to.x, y:CORRIDOR_Y});
+  }
+  pts.push({x:to.x, y:to.y});
+  return pts;
+}
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+let mAct = false; // meeting active
+let tick = 0;
+let crmDrawerOpen = -1; // -1 = closed, 0-3 = drawer index
+let crmDrawerFrame = 0;
+let lexcGlow = -1;
+let lexcGlowFrame = 0;
+
+// ── DRAW: FLOOR & GRID ───────────────────────────────────────────────────
+function drawFloor() {
+  ctx.fillStyle = PAL.bg;
+  ctx.fillRect(0,0,W,H);
+
+  // Corridor
+  ctx.fillStyle = PAL.corridor;
+  ctx.fillRect(0, CORRIDOR_TOP, W, CORRIDOR_BOT - CORRIDOR_TOP);
+
+  // Subtle grid
+  ctx.strokeStyle = '#0a0a14';
+  ctx.lineWidth = 0.3;
+  for (let x=0; x<W; x+=20) {
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+  }
+  for (let y=0; y<H; y+=20) {
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+  }
+
+  // Corridor dashed center line
+  ctx.strokeStyle = '#12121e';
+  ctx.lineWidth = 0.5;
+  ctx.setLineDash([6,8]);
+  ctx.beginPath(); ctx.moveTo(0,CORRIDOR_Y); ctx.lineTo(W,CORRIDOR_Y); ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+// ── DRAW: ROOMS ───────────────────────────────────────────────────────────
+function drawRooms() {
+  ROOMS.forEach(r => {
+    ctx.fillStyle = r.col;
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.strokeStyle = PAL.wall;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(r.x, r.y, r.w, r.h);
+
+    // Door gap
+    if (r.id === 'meet' || r.id === 'server') {
+      ctx.fillStyle = PAL.corridor;
+      const dx = r.id === 'meet' ? r.x + r.w - 2 : r.x;
+      ctx.fillRect(dx, r.y + r.h - 24, 4, 20);
+    } else {
+      ctx.fillStyle = PAL.corridor;
+      const dx = r.id === 'crm' ? r.x + r.w - 2 : r.x;
+      ctx.fillRect(dx, r.y, 4, 20);
+    }
+
+    // Label
+    ctx.fillStyle = PAL.text;
+    ctx.font = '7px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(r.label, r.x + r.w/2, r.y + 14);
+
+    drawFurniture(r);
+  });
+}
+
+// ── DRAW: FURNITURE ───────────────────────────────────────────────────────
+function drawFurniture(r) {
+  const rx = r.x, ry = r.y;
+  switch(r.id) {
+    case 'meet': {
+      // Table
+      ctx.fillStyle = '#14142a';
+      roundRect(rx+25, ry+65, 76, 45, 4);
+      ctx.fill();
+      ctx.strokeStyle = '#1e1e3a';
+      ctx.lineWidth = 1;
+      roundRect(rx+25, ry+65, 76, 45, 4);
+      ctx.stroke();
+      // Chairs
+      [[35,55],[63,52],[91,55],[35,115],[63,118],[91,115]].forEach(([cx,cy])=>{
+        ctx.fillStyle = '#10102a';
+        ctx.fillRect(rx+cx-5, ry+cy-4, 10, 8);
+        ctx.strokeStyle = '#1a1a3a';
+        ctx.strokeRect(rx+cx-5, ry+cy-4, 10, 8);
+      });
+      break;
+    }
+    case 'crm': {
+      // Filing cabinet — 4 drawers
+      for (let i=0; i<4; i++) {
+        const dy = ry + 30 + i*32;
+        const openAmt = (crmDrawerOpen === i) ? Math.min(crmDrawerFrame, 12) : 0;
+        ctx.fillStyle = '#0a1a0a';
+        ctx.fillRect(rx+20, dy, 86 + openAmt, 28);
+        ctx.strokeStyle = '#1a3a1a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(rx+20, dy, 86 + openAmt, 28);
+        // Handle
+        ctx.fillStyle = '#2a5a2a';
+        ctx.fillRect(rx+58, dy+11, 10, 6);
+        // Drawer number
+        ctx.fillStyle = '#1a3a1a';
+        ctx.font = '6px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(String(i+1), rx+30, dy+18);
+      }
+      break;
+    }
+    case 'lexc': {
+      // Bookshelves with discs
+      for (let i=0; i<4; i++) {
+        const dy = ry + 30 + i*32;
+        ctx.fillStyle = '#141008';
+        ctx.fillRect(rx+15, dy, 96, 28);
+        ctx.strokeStyle = '#2a2010';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(rx+15, dy, 96, 28);
+        // Books/discs
+        const cols = ['#3a2a10','#2a3a10','#10203a','#3a1020','#1a302a','#302a1a'];
+        for (let j=0; j<6; j++) {
+          const glow = (lexcGlow === i*6+j) ? Math.sin(lexcGlowFrame*0.15)*0.5+0.5 : 0;
+          ctx.fillStyle = glow > 0.2 ? '#eab308' : cols[j];
+          ctx.fillRect(rx+20+j*15, dy+4, 12, 20);
+        }
+      }
+      break;
+    }
+    case 'server': {
+      // Server rack
+      ctx.fillStyle = '#0c0c1c';
+      ctx.fillRect(rx+25, ry+28, 76, 125);
+      ctx.strokeStyle = '#1a1a3a';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(rx+25, ry+28, 76, 125);
+      // Units
+      for (let i=0; i<5; i++) {
+        const sy = ry + 34 + i*23;
+        ctx.fillStyle = '#0e0e20';
+        ctx.fillRect(rx+30, sy, 66, 19);
+        ctx.strokeStyle = '#161630';
+        ctx.strokeRect(rx+30, sy, 66, 19);
+        // LED — blink based on tick
+        const on = ((tick + i*13) % 60) < 45;
+        ctx.fillStyle = on ? '#22c55e' : '#0a1a0a';
+        ctx.fillRect(rx+88, sy+7, 4, 4);
+        // Second LED
+        const on2 = ((tick + i*7 + 30) % 80) < 50;
+        ctx.fillStyle = on2 ? '#3b82f6' : '#0a0a1a';
+        ctx.fillRect(rx+82, sy+7, 4, 4);
+      }
+      break;
+    }
+  }
+}
+
+// ── DRAW: DESKS ───────────────────────────────────────────────────────────
+function drawDesks() {
+  DESKS.forEach(d => {
+    // Desk area
+    ctx.fillStyle = PAL.desk;
+    ctx.fillRect(d.x, d.y, d.w, d.h);
+    ctx.strokeStyle = PAL.deskBord;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(d.x, d.y, d.w, d.h);
+
+    // Monitor
+    const mx = d.x + d.w/2 - 16, my = d.y + 12;
+    ctx.fillStyle = '#0a0a14';
+    ctx.fillRect(mx, my, 32, 22);
+    ctx.strokeStyle = ACOL[d.id] + '30';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(mx, my, 32, 22);
+
+    // Screen glow when agent is working
+    if (AG[d.id] && AG[d.id].state === 'working' && !AG[d.id].busy) {
+      ctx.fillStyle = ACOL[d.id] + '15';
+      ctx.fillRect(mx+1, my+1, 30, 20);
+    }
+
+    // Stand
+    ctx.fillStyle = '#0a0a14';
+    ctx.fillRect(d.x + d.w/2 - 3, my+22, 6, 4);
+
+    // Agent label
+    ctx.fillStyle = ACOL[d.id] + '90';
+    ctx.font = '7px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(ANAMES[d.id], d.x + d.w/2, d.y + d.h - 4);
+
+    // Task text
+    const a = AG[d.id];
+    if (a && a.task && !a.busy) {
+      ctx.fillStyle = ACOL[d.id] + '50';
+      ctx.font = '6px monospace';
+      const txt = a.task.length > 14 ? a.task.slice(0,13)+'...' : a.task;
+      ctx.fillText(txt, d.x + d.w/2, d.y + d.h + 10);
+    }
+  });
+}
+
+// ── DRAW: AGENTS ──────────────────────────────────────────────────────────
+function drawAgent(id) {
+  const a = AG[id];
+  const moving = a.path.length > 0;
+  const bob = Math.sin(a.frame * (moving ? 0.25 : 0.06)) * (moving ? 2 : 0.8);
+  const lean = moving ? Math.sin(a.frame * 0.3) * 1.5 : 0;
+  const x = Math.round(a.x + lean);
+  const y = Math.round(a.y + bob);
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.ellipse(x, y+9, 6, 2.5, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // Body
+  ctx.fillStyle = ABODY[id];
+  roundRect(x-5, y-1, 10, 10, 2);
+  ctx.fill();
+
+  // Head
+  ctx.fillStyle = ACOL[id];
+  ctx.beginPath();
+  ctx.arc(x, y-6, 5.5, 0, Math.PI*2);
+  ctx.fill();
+
+  // Eyes
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(x-3, y-7, 2, 2);
+  ctx.fillRect(x+1, y-7, 2, 2);
+
+  // Pupils — look toward path target
+  if (moving && a.path.length > 0) {
+    const t = a.path[0];
+    const dx = t.x > a.x ? 1 : t.x < a.x ? -1 : 0;
+    ctx.fillStyle = '#111';
+    ctx.fillRect(x-3+dx, y-7, 1, 1);
+    ctx.fillRect(x+1+dx, y-7, 1, 1);
+  }
+
+  // Name tag while moving
+  if (moving) {
+    ctx.fillStyle = ACOL[id] + '80';
+    ctx.font = '6px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(ANAMES[id], x, y-14);
+  }
+}
+
+function drawAgents() {
+  // Sort by Y for depth
+  const sorted = Object.keys(AG).sort((a,b) => AG[a].y - AG[b].y);
+  sorted.forEach(drawAgent);
+}
+
+// ── DRAW: HUD OVERLAY ─────────────────────────────────────────────────────
+function drawHUD() {
+  // Connection indicator
+  const connected = !!window._sseConnected;
+  ctx.fillStyle = connected ? '#22c55e' : '#ef4444';
+  ctx.beginPath();
+  ctx.arc(W-12, 12, 4, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = PAL.text;
+  ctx.font = '6px monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText(connected ? 'LIVE' : 'OFF', W-20, 14);
+}
+
+// ── UPDATE ────────────────────────────────────────────────────────────────
+function update() {
+  tick++;
+  for (const id in AG) {
+    const a = AG[id];
+    a.frame++;
+    if (a.path.length > 0) {
+      const t = a.path[0];
+      const dx = t.x - a.x, dy = t.y - a.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < SPD) {
+        a.x = t.x; a.y = t.y;
+        a.path.shift();
+      } else {
+        a.x += (dx/dist)*SPD;
+        a.y += (dy/dist)*SPD;
+      }
+    }
+  }
+  // CRM drawer animation
+  if (crmDrawerOpen >= 0) crmDrawerFrame++;
+  // LexC glow animation
+  if (lexcGlow >= 0) lexcGlowFrame++;
+}
+
+// ── MAIN LOOP ─────────────────────────────────────────────────────────────
+function loop() {
+  update();
+  drawFloor();
+  drawRooms();
+  drawDesks();
+  drawAgents();
+  drawHUD();
+  requestAnimationFrame(loop);
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────
+function roundRect(x,y,w,h,r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+// ── ACTIONS ───────────────────────────────────────────────────────────────
+function doVisit(fromId, toId) {
+  const from = AG[fromId], to = AG[toId];
+  if (!from || !to || from.busy) return;
+  from.busy = true;
+  const target = {x: to.hx - 15, y: to.hy};
+  from.path = buildPath({x:from.x, y:from.y}, target);
+  setStatus(`${ANAMES[fromId]} visita ${ANAMES[toId]}`);
+  setTimeout(() => {
+    from.path = buildPath({x:from.x, y:from.y}, {x:from.hx, y:from.hy});
+    setTimeout(() => { from.busy = false; }, 3000);
+  }, 4000);
+}
+
+function doMeeting(caller, members, isLocal) {
+  if (mAct) return;
+  mAct = true;
+  members.forEach((id,i) => {
+    const a = AG[id];
+    if (!a) return;
+    a.busy = true;
+    const seat = MEET_SEATS[i % MEET_SEATS.length];
+    const target = {x: ROOMS[0].x + seat.x, y: ROOMS[0].y + seat.y};
+    a.path = buildPath({x:a.x, y:a.y}, target);
+  });
+  document.getElementById('chatbox').style.display = 'flex';
+  document.getElementById('chat-msgs').innerHTML = '';
+  pushMsg(caller, 'Reuniao convocada.', !Object.keys(ACOL).includes(caller));
+  setStatus('REUNIAO: ' + members.map(m=>ANAMES[m]||m.toUpperCase()).join(', '));
+}
+
+function endMeet() {
+  mAct = false;
+  document.getElementById('chatbox').style.display = 'none';
+  for (const id in AG) {
+    const a = AG[id];
+    if (a.busy) {
+      a.path = buildPath({x:a.x, y:a.y}, {x:a.hx, y:a.hy});
+      setTimeout(((ag) => () => { ag.busy = false; })(a), 3500);
+    }
+  }
+  setStatus('Reuniao terminada.');
+}
+
+function doCRM(agentId, drawer) {
+  const a = AG[agentId];
+  if (!a || a.busy) return;
+  a.busy = true;
+  a.path = buildPath({x:a.x, y:a.y}, TARGETS.crm);
+  setStatus(`${ANAMES[agentId]} acede ao CRM`);
+  crmDrawerOpen = typeof drawer === 'number' ? drawer : Math.floor(Math.random()*4);
+  crmDrawerFrame = 0;
+  setTimeout(() => {
+    crmDrawerOpen = -1; crmDrawerFrame = 0;
+    a.path = buildPath({x:a.x, y:a.y}, {x:a.hx, y:a.hy});
+    setTimeout(() => { a.busy = false; }, 3000);
+  }, 5000);
+}
+
+function doLexC(agentId) {
+  const a = AG[agentId];
+  if (!a || a.busy) return;
+  a.busy = true;
+  a.path = buildPath({x:a.x, y:a.y}, TARGETS.lexc);
+  setStatus(`${ANAMES[agentId]} consulta o Lex Corpus`);
+  lexcGlow = Math.floor(Math.random()*24);
+  lexcGlowFrame = 0;
+  setTimeout(() => {
+    lexcGlow = -1; lexcGlowFrame = 0;
+    a.path = buildPath({x:a.x, y:a.y}, {x:a.hx, y:a.hy});
+    setTimeout(() => { a.busy = false; }, 3000);
+  }, 5000);
+}
+
+function pushMsg(who, msg, isHuman) {
+  const el = document.getElementById('chat-msgs');
+  const div = document.createElement('div');
+  div.className = 'msg';
+  const color = ACOL[who] || (isHuman ? '#60a5fa' : '#3a6a9a');
+  const name = ANAMES[who] || (who||'SISTEMA').toUpperCase();
+  div.innerHTML = '<span style="color:'+color+'">'+name+'</span> '+msg;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function setStatus(msg) {
+  document.getElementById('status').textContent = msg;
+}
+
+function updateHUD(stats) {
+  const map = {'s-proc':stats.processos,'s-tick':stats.tickets,'s-msg':stats.msgs,'s-pec':stats.pecas,'s-cli':stats.clientes};
+  Object.entries(map).forEach(([id,val])=>{
+    const el = document.getElementById(id);
+    if (el) el.textContent = String(val ?? 0);
+  });
+}
+
+// ── MEETING BUTTON UI ─────────────────────────────────────────────────────
+document.getElementById('btn-meeting').onclick = () => {
+  const panel = document.getElementById('meeting-panel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+};
+
+document.getElementById('btn-start-meet').onclick = () => {
+  const checks = document.querySelectorAll('#meeting-panel input[type=checkbox]:checked');
+  const members = Array.from(checks).map(c => c.value);
+  if (members.length === 0) return;
+  document.getElementById('meeting-panel').style.display = 'none';
+  const caller = window._currentUser || 'eduardo';
+  doMeeting(caller, members, true);
+  // Auto-end after 30s if no SSE meeting_end
+  setTimeout(() => { if (mAct) endMeet(); }, 30000);
+};
+
+// ── SSE — EVENTOS REAIS DO PAPERCLIP ─────────────────────────────────────
+window._sseConnected = false;
+window._currentUser = '';
+
+fetch('/auth/me')
+  .then(r => r.json())
+  .then(u => {
+    if (u.displayName) {
+      document.getElementById('user-name').textContent = u.displayName.toUpperCase();
+      window._currentUser = u.username;
+    }
+  })
+  .catch(() => { window.location.href = '/login'; });
+
+const es = new EventSource('/events');
+
+es.onopen = () => {
+  window._sseConnected = true;
+  setStatus('Ligado ao servidor. A aguardar eventos...');
+};
+
+es.onerror = () => {
+  window._sseConnected = false;
+  setStatus('A reconectar ao servidor...');
+};
+
+es.onmessage = (e) => {
+  try { handleEvent(JSON.parse(e.data)); }
+  catch (err) { console.warn('SSE parse error:', err); }
+};
+
+function handleEvent(ev) {
+  switch (ev.type) {
+    case 'agent_state': {
+      const a = AG[ev.agentId];
+      if (a) {
+        a.state = ev.state || 'idle';
+        if (ev.task) a.task = ev.task;
+      }
+      break;
+    }
+    case 'agent_visit':
+      if (!AG[ev.from]?.busy && !AG[ev.to]?.busy) doVisit(ev.from, ev.to);
+      break;
+    case 'meeting_start':
+      if (!mAct) doMeeting(ev.caller, ev.members, false);
+      break;
+    case 'meeting_msg':
+      if (document.getElementById('chatbox').style.display !== 'none')
+        pushMsg(ev.who, ev.msg, ev.isHuman || false);
+      break;
+    case 'meeting_end':
+      endMeet();
+      break;
+    case 'crm_access':
+      if (!AG[ev.agentId]?.busy) doCRM(ev.agentId, ev.drawer);
+      break;
+    case 'lexc_access':
+      if (!AG[ev.agentId]?.busy) doLexC(ev.agentId);
+      break;
+    case 'ticket_created':
+      setStatus('Ticket: '+(ev.from||'').toUpperCase()+' -> '+(ev.to||'').toUpperCase()+' ['+ev.tipo+']');
+      if (!AG[ev.from]?.busy && !AG[ev.to]?.busy) doVisit(ev.from, ev.to);
+      break;
+    case 'stats':
+      updateHUD(ev);
+      break;
+    case 'alert':
+      setStatus(ev.msg || '');
+      break;
+  }
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────────────
+setTimeout(() => setStatus('SD Legal activo. A aguardar eventos do Paperclip...'), 800);
+loop();
+</script>
+</body>
+</html>
