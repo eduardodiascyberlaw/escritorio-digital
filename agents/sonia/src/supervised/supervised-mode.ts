@@ -1,5 +1,16 @@
 import type { EvolutionApiGateway } from "../gateway/evolution-api.js";
 import type { ElevenLabsTts } from "../tts/elevenlabs-tts.js";
+import type { VaultWriter } from "../obsidian/vault-writer.js";
+import {
+  loadSuperiors,
+  identifySuperior,
+  type AuthorizedSuperior,
+} from "../hierarchy/superiors.js";
+import {
+  handleInstruction,
+  handleClearInstructions,
+  formatActiveInstructions,
+} from "../hierarchy/instruction-handler.js";
 
 export interface PendingDraft {
   id: string;
@@ -17,15 +28,20 @@ export class SupervisedMode {
   private tts: ElevenLabsTts | null;
   private controlGroupJid: string | null = null;
   private controlGroupName: string;
+  private vaultWriter: VaultWriter | null;
+  private superiors: AuthorizedSuperior[];
 
   constructor(
     gateway: EvolutionApiGateway,
     controlGroupName: string = "SD Legal",
-    tts: ElevenLabsTts | null = null
+    tts: ElevenLabsTts | null = null,
+    vaultWriter: VaultWriter | null = null
   ) {
     this.gateway = gateway;
     this.controlGroupName = controlGroupName;
     this.tts = tts;
+    this.vaultWriter = vaultWriter;
+    this.superiors = loadSuperiors();
   }
 
   async initialize(): Promise<void> {
@@ -80,9 +96,34 @@ export class SupervisedMode {
   }
 
   async handleControlResponse(
-    responseText: string
-  ): Promise<{ action: "sent" | "edited" | "ignored" | "unknown"; draftId?: string }> {
+    responseText: string,
+    senderPhone?: string
+  ): Promise<{ action: string; draftId?: string }> {
     const text = responseText.trim();
+
+    // ─── Hierarchy commands (require sender identification) ───
+
+    // INSTRUCAO: [texto] — add instruction from superior
+    const instrucaoMatch = text.match(/^INSTRUC[AÃ]O:?\s+([\s\S]+)/i);
+    if (instrucaoMatch) {
+      return this.handleInstrucaoCommand(instrucaoMatch[1].trim(), senderPhone);
+    }
+
+    // LIMPAR INSTRUCOES — clear all active instructions
+    if (/^LIMPAR\s+INSTRUC[OÕ]ES$/i.test(text)) {
+      return this.handleLimparCommand(senderPhone);
+    }
+
+    // INSTRUCOES — list active instructions
+    if (/^INSTRUC[OÕ]ES$/i.test(text)) {
+      const formatted = formatActiveInstructions();
+      if (this.controlGroupJid) {
+        await this.gateway.sendToGroup(this.controlGroupJid, formatted);
+      }
+      return { action: "listed" };
+    }
+
+    // ─── Draft commands ───
 
     // ENVIAR [id] — approve and send as-is
     const enviarMatch = text.match(/^ENVIAR\s+(\S+)/i);
@@ -142,6 +183,83 @@ export class SupervisedMode {
     }
 
     return { action: "unknown" };
+  }
+
+  private async handleInstrucaoCommand(
+    texto: string,
+    senderPhone?: string
+  ): Promise<{ action: string }> {
+    if (!senderPhone) {
+      console.warn("[Supervisionado] INSTRUCAO recebida sem sender — ignorar");
+      return { action: "unauthorized" };
+    }
+
+    const superior = identifySuperior(senderPhone, this.superiors);
+    if (!superior) {
+      console.warn(
+        `[Supervisionado] INSTRUCAO de numero nao autorizado: ${senderPhone}`
+      );
+      if (this.controlGroupJid) {
+        await this.gateway.sendToGroup(
+          this.controlGroupJid,
+          `⚠️ Instrucao ignorada — numero ${senderPhone} nao reconhecido como superior autorizado.`
+        );
+      }
+      return { action: "unauthorized" };
+    }
+
+    if (!this.vaultWriter) {
+      console.warn("[Supervisionado] VaultWriter nao disponivel — instrucao nao auditada");
+      return { action: "error" };
+    }
+
+    const result = await handleInstruction(texto, superior, this.vaultWriter);
+    if (result.accepted && this.controlGroupJid) {
+      await this.gateway.sendToGroup(
+        this.controlGroupJid,
+        `✅ Instrucao *${result.id}* de ${superior.referencia} registada e activa.\n\n_"${texto}"_`
+      );
+    }
+
+    return { action: result.accepted ? "instruction_added" : "error" };
+  }
+
+  private async handleLimparCommand(
+    senderPhone?: string
+  ): Promise<{ action: string }> {
+    if (!senderPhone) {
+      return { action: "unauthorized" };
+    }
+
+    const superior = identifySuperior(senderPhone, this.superiors);
+    if (!superior) {
+      if (this.controlGroupJid) {
+        await this.gateway.sendToGroup(
+          this.controlGroupJid,
+          `⚠️ Comando ignorado — numero nao reconhecido como superior autorizado.`
+        );
+      }
+      return { action: "unauthorized" };
+    }
+
+    if (!this.vaultWriter) {
+      return { action: "error" };
+    }
+
+    const result = await handleClearInstructions(superior, this.vaultWriter);
+    if (result.accepted && this.controlGroupJid) {
+      await this.gateway.sendToGroup(
+        this.controlGroupJid,
+        `🗑️ ${result.count} instrucoes removidas por ${superior.referencia}.`
+      );
+    } else if (!result.accepted && this.controlGroupJid) {
+      await this.gateway.sendToGroup(
+        this.controlGroupJid,
+        `⚠️ ${superior.referencia} nao tem autorizacao para limpar instrucoes (requer nivel >= Dona Carol).`
+      );
+    }
+
+    return { action: result.accepted ? "instructions_cleared" : "unauthorized" };
   }
 
   private async approveDraft(

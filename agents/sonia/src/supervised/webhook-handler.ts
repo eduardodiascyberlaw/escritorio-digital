@@ -33,6 +33,7 @@ interface WebhookMessage {
     remoteJid: string;
     fromMe: boolean;
     id: string;
+    participant?: string; // sender JID in group messages
   };
   message?: {
     conversation?: string;
@@ -103,7 +104,10 @@ export class WebhookHandler {
       if (this.controlGroupJid && remoteJid === this.controlGroupJid) {
         const text = this.extractText(payload.data);
         if (text) {
-          await this.supervised.handleControlResponse(text);
+          const senderPhone = payload.data.key.participant
+            ? this.jidToPhone(payload.data.key.participant)
+            : undefined;
+          await this.supervised.handleControlResponse(text, senderPhone);
         }
       }
       // Ignore other groups
