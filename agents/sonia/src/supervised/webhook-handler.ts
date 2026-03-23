@@ -28,6 +28,7 @@ import { StubProJurisAdapter } from "../client/projuris-adapter.js";
 import { StubDriveAdapter } from "../client/drive-adapter.js";
 import { detectIntent } from "../conversation/intent-detector.js";
 import { CONVERSATION_PROMPT } from "../llm/prompts.js";
+import type { ConversationMemory } from "../conversation/conversation-memory.js";
 
 // Evolution API webhook payload types
 interface WebhookMessage {
@@ -62,6 +63,7 @@ export class WebhookHandler {
   private vaultWriter: VaultWriter;
   private paperclip: PaperclipAdapter;
   private gateway: EvolutionApiGateway;
+  private memory: ConversationMemory;
   private transcriber: AudioTranscriber;
   private controlGroupJid: string | null = null;
 
@@ -79,6 +81,7 @@ export class WebhookHandler {
     vaultWriter: VaultWriter;
     paperclip: PaperclipAdapter;
     gateway: EvolutionApiGateway;
+    memory: ConversationMemory;
     controlGroupJid: string | null;
   }) {
     this.supervised = deps.supervised;
@@ -88,6 +91,7 @@ export class WebhookHandler {
     this.vaultWriter = deps.vaultWriter;
     this.paperclip = deps.paperclip;
     this.gateway = deps.gateway;
+    this.memory = deps.memory;
     this.controlGroupJid = deps.controlGroupJid;
     this.transcriber = new AudioTranscriber(deps.gemini);
   }
@@ -158,6 +162,9 @@ export class WebhookHandler {
       detail: text.substring(0, 80),
     });
 
+    // Store incoming message in conversation memory
+    this.memory.add(phone, "in", text);
+
     // Check business hours — outside hours, queue for morning routine
     if (isOutsideHours()) {
       addOvernightMessage({
@@ -214,6 +221,9 @@ export class WebhookHandler {
     name: string | null,
     text: string
   ): Promise<{ response: string; context: string }> {
+    // Build conversation history context (excludes current message, already stored)
+    const historyContext = this.memory.format(phone, name);
+
     // 1. Deontological check
     const deontoCheck = checkDeontologicalLimits(text);
     if (deontoCheck.mustEscalate) {
@@ -293,7 +303,7 @@ REGRAS:
 
       const response = await this.gemini.generateText(
         onboardingPrompt,
-        `Nome do cliente: ${name ?? "desconhecido"}\nMensagem: "${text}"\nDados ja recolhidos: ${JSON.stringify(resolved.data, null, 2)}`
+        `Nome do cliente: ${name ?? "desconhecido"}\nMensagem: "${text}"\nDados ja recolhidos: ${JSON.stringify(resolved.data, null, 2)}${historyContext}`
       );
 
       return {
@@ -336,7 +346,7 @@ REGRAS:
 
       const response = await this.gemini.generateText(
         CONVERSATION_PROMPT,
-        `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem: "${text}"${extraContext}`
+        `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem: "${text}"${extraContext}${historyContext}`
       );
 
       return {
@@ -346,21 +356,18 @@ REGRAS:
     }
 
     // 5b. Triagem — classificar e criar ticket para o Rex
+    const priorMessages = this.memory.toWhatsAppMessages(phone);
+    const allMessages = priorMessages.length > 0
+      ? priorMessages
+      : [{ timestamp: new Date().toISOString(), remetente: "cliente" as const, tipo: "texto" as const, conteudo: text }];
     const miniHistory = {
       numero_cliente: phone,
       periodo: {
-        inicio: new Date().toISOString(),
-        fim: new Date().toISOString(),
+        inicio: allMessages[0].timestamp,
+        fim: allMessages[allMessages.length - 1].timestamp,
       },
-      total_mensagens: 1,
-      mensagens: [
-        {
-          timestamp: new Date().toISOString(),
-          remetente: "cliente" as const,
-          tipo: "texto" as const,
-          conteudo: text,
-        },
-      ],
+      total_mensagens: allMessages.length,
+      mensagens: allMessages,
       media_files: [],
     };
 
@@ -383,7 +390,7 @@ REGRAS:
     // Gerar resposta conversacional (mesmo na triagem, ser humana)
     const response = await this.gemini.generateText(
       CONVERSATION_PROMPT,
-      `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem: "${text}"\n\nCONTEXTO INTERNO (nao mencionar ao cliente): O caso foi registado como ${classification.classificacao.area} / ${classification.classificacao.sub_tipo}. A equipa vai analisar.`
+      `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem: "${text}"\n\nCONTEXTO INTERNO (nao mencionar ao cliente): O caso foi registado como ${classification.classificacao.area} / ${classification.classificacao.sub_tipo}. A equipa vai analisar.${historyContext}`
     );
 
     return {

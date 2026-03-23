@@ -11,6 +11,7 @@ import { HttpCrmAdapter } from "./client/http-crm-adapter.js";
 import { StubPaperclipAdapter } from "./tickets/paperclip-adapter.js";
 import { startHeartbeat } from "./heartbeat/heartbeat.js";
 import { ElevenLabsTts } from "./tts/elevenlabs-tts.js";
+import { ConversationMemory } from "./conversation/conversation-memory.js";
 import type { CrmAdapter } from "./client/crm-adapter.js";
 
 // ─────────────────────────────────────────────
@@ -65,7 +66,8 @@ const tts = new ElevenLabsTts({
   voiceId: config.elevenlabsVoiceId,
 });
 
-const supervised = new SupervisedMode(gateway, CONTROL_GROUP_NAME, tts, vaultWriter);
+const memory = new ConversationMemory();
+const supervised = new SupervisedMode(gateway, CONTROL_GROUP_NAME, tts, vaultWriter, memory);
 
 // ─────────────────────────────────────────────
 // Servidor HTTP (recebe webhooks da Evolution API)
@@ -154,6 +156,7 @@ async function start(): Promise<void> {
     vaultWriter,
     paperclip,
     gateway,
+    memory,
     controlGroupJid,
   });
 

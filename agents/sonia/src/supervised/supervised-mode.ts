@@ -11,6 +11,7 @@ import {
   handleClearInstructions,
   formatActiveInstructions,
 } from "../hierarchy/instruction-handler.js";
+import type { ConversationMemory } from "../conversation/conversation-memory.js";
 
 export interface PendingDraft {
   id: string;
@@ -29,18 +30,21 @@ export class SupervisedMode {
   private controlGroupJid: string | null = null;
   private controlGroupName: string;
   private vaultWriter: VaultWriter | null;
+  private memory: ConversationMemory | null;
   private superiors: AuthorizedSuperior[];
 
   constructor(
     gateway: EvolutionApiGateway,
     controlGroupName: string = "SD Legal",
     tts: ElevenLabsTts | null = null,
-    vaultWriter: VaultWriter | null = null
+    vaultWriter: VaultWriter | null = null,
+    memory: ConversationMemory | null = null
   ) {
     this.gateway = gateway;
     this.controlGroupName = controlGroupName;
     this.tts = tts;
     this.vaultWriter = vaultWriter;
+    this.memory = memory;
     this.superiors = loadSuperiors();
   }
 
@@ -275,6 +279,7 @@ export class SupervisedMode {
 
     await this.gateway.sendMessage(draft.clientPhone, draft.proposedResponse);
     this.pendingDrafts.delete(draftId);
+    this.memory?.add(draft.clientPhone, "out", draft.proposedResponse);
 
     if (this.controlGroupJid) {
       await this.gateway.sendToGroup(
@@ -317,6 +322,7 @@ export class SupervisedMode {
     }
 
     this.pendingDrafts.delete(draftId);
+    this.memory?.add(draft.clientPhone, "out", draft.proposedResponse);
 
     if (this.controlGroupJid) {
       await this.gateway.sendToGroup(
@@ -342,6 +348,7 @@ export class SupervisedMode {
 
     await this.gateway.sendMessage(draft.clientPhone, newText);
     this.pendingDrafts.delete(draftId);
+    this.memory?.add(draft.clientPhone, "out", newText);
 
     if (this.controlGroupJid) {
       await this.gateway.sendToGroup(
