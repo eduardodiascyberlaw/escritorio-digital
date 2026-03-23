@@ -27,7 +27,8 @@ import type { ChamadoHumano } from "../escalation/types.js";
 import { StubProJurisAdapter } from "../client/projuris-adapter.js";
 import { StubDriveAdapter } from "../client/drive-adapter.js";
 import { detectIntent, hasStatusIntent, type DetectedLanguage } from "../conversation/intent-detector.js";
-import { CONVERSATION_PROMPT } from "../llm/prompts.js";
+import { CONVERSATION_PROMPT, buildConversationPromptWithServices } from "../llm/prompts.js";
+import { findRelevantServices, getService, formatServicesForPrompt } from "../knowledge/service-kb.js";
 import type { ConversationMemory } from "../conversation/conversation-memory.js";
 import { MessageBatcher } from "../conversation/message-batcher.js";
 
@@ -492,14 +493,19 @@ REGRAS:
       }
 
       // Conversa normal (saudacao, agradecimento, conversa_geral)
+      // Detectar servicos relevantes pelo texto do cliente
+      const relevantServices = findRelevantServices(text);
+      const conversaPrompt = buildConversationPromptWithServices(relevantServices);
+
       const response = await this.gemini.generateText(
-        CONVERSATION_PROMPT,
+        conversaPrompt,
         `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem: "${text}"${historyContext}${langInstruction}`
       );
 
+      const serviceNames = relevantServices.map((s) => s.codigo).join(", ");
       return {
         response,
-        context: `💬 Conversa (${intent.intent}) — sem triagem`,
+        context: `💬 Conversa (${intent.intent})${serviceNames ? ` — servicos detectados: ${serviceNames}` : ""} — sem triagem`,
       };
     }
 
@@ -535,9 +541,14 @@ REGRAS:
       await this.paperclip.submitTicket(ticket);
     }
 
+    // Buscar info detalhada do servico classificado
+    const classifiedService = getService(classification.classificacao.sub_tipo);
+    const triagemServices = classifiedService ? [classifiedService] : findRelevantServices(text);
+    const triagemPrompt = buildConversationPromptWithServices(triagemServices);
+
     // Gerar resposta conversacional (mesmo na triagem, ser humana)
     const response = await this.gemini.generateText(
-      CONVERSATION_PROMPT,
+      triagemPrompt,
       `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem: "${text}"\n\nCONTEXTO INTERNO (nao mencionar ao cliente): O caso foi registado como ${classification.classificacao.area} / ${classification.classificacao.sub_tipo}. A equipa vai analisar.${historyContext}${langInstruction}`
     );
 

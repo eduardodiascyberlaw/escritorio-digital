@@ -7,6 +7,12 @@
 
 import { buildPrompt } from "../identity/prompt-builder.js";
 import { DISCLAIMER } from "../identity/persona.js";
+import {
+  getAllServiceNames,
+  findRelevantServices,
+  formatServicesForPrompt,
+  type ServiceInfo,
+} from "../knowledge/service-kb.js";
 
 // Re-export para manter compatibilidade com imports existentes
 export { DISCLAIMER };
@@ -142,8 +148,7 @@ REGRAS:
 // CONVERSATION — Resposta geral a mensagens
 // ─────────────────────────────────────────────
 
-export const CONVERSATION_PROMPT = buildPrompt(
-  `TAREFA: Responde a mensagem do cliente de forma natural e empatica.
+const CONVERSATION_RULES = `TAREFA: Responde a mensagem do cliente de forma natural e empatica.
 
 REGRAS:
 - Sempre comeca com cumprimento se for a primeira mensagem do dia
@@ -154,15 +159,21 @@ REGRAS:
 - Sê concisa mas calorosa — WhatsApp nao e email
 - Maximo 3-4 paragrafos curtos por mensagem
 
-SERVICOS DO ESCRITORIO (para referencia):
-- Autorizacao de residencia (pedido e renovacao)
-- Nacionalidade portuguesa
-- Emissao de NIF
-- Constituicao de empresa e abertura de actividade
-- Processo laboral
-- Recursos judiciais (AR indeferida, saida voluntaria)
-- Casamento e divorcio (Portugal e Brasil)
-- Revisao/homologacao de sentenca estrangeira
-- Injuncao de pagamento
-- Insolvencia (empresa e pessoal)`
-);
+SERVICOS DO ESCRITORIO:
+${getAllServiceNames().join("\n")}`;
+
+/** Prompt base para conversas sem contexto de servico especifico. */
+export const CONVERSATION_PROMPT = buildPrompt(CONVERSATION_RULES);
+
+/**
+ * Constroi prompt de conversa com informacao detalhada dos servicos relevantes.
+ * Usado quando o intent detector ou a classificacao identifica um servico especifico.
+ *
+ * @param services - Servicos relevantes detectados (do service-kb)
+ */
+export function buildConversationPromptWithServices(services: ServiceInfo[]): string {
+  if (services.length === 0) return CONVERSATION_PROMPT;
+
+  const serviceContext = formatServicesForPrompt(services);
+  return buildPrompt(`${CONVERSATION_RULES}\n\n${serviceContext}`);
+}
