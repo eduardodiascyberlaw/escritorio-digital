@@ -26,7 +26,7 @@ import { escalateToHuman } from "../escalation/escalation.js";
 import type { ChamadoHumano } from "../escalation/types.js";
 import { StubProJurisAdapter } from "../client/projuris-adapter.js";
 import { StubDriveAdapter } from "../client/drive-adapter.js";
-import { detectIntent } from "../conversation/intent-detector.js";
+import { detectIntent, hasStatusIntent } from "../conversation/intent-detector.js";
 import { CONVERSATION_PROMPT } from "../llm/prompts.js";
 import type { ConversationMemory } from "../conversation/conversation-memory.js";
 
@@ -186,11 +186,15 @@ export class WebhookHandler {
 
     // Process the message and generate a draft response
     try {
-      const { response, context: baseContext } = await this.processMessage(
+      const { response, context: baseContext, followUp, skipDraft } = await this.processMessage(
         phone,
         pushName,
         text
       );
+
+      // Some flows handle sending directly (e.g. ack auto-sent + orientation requested)
+      if (skipDraft) return;
+
       const context = isAudioMessage
         ? `🎤 Áudio transcrito: "${text.substring(0, 100)}${text.length > 100 ? "..." : ""}"\n${baseContext}`
         : baseContext;
@@ -203,6 +207,17 @@ export class WebhookHandler {
         response,
         context
       );
+
+      // Submit follow-up draft if present (e.g. status after greeting)
+      if (followUp) {
+        await this.supervised.submitDraft(
+          phone,
+          pushName,
+          text,
+          followUp.response,
+          followUp.context
+        );
+      }
     } catch (error) {
       console.error(`[Webhook] Erro ao processar mensagem:`, error);
 
@@ -220,7 +235,7 @@ export class WebhookHandler {
     phone: string,
     name: string | null,
     text: string
-  ): Promise<{ response: string; context: string }> {
+  ): Promise<{ response: string; context: string; followUp?: { response: string; context: string }; skipDraft?: boolean }> {
     // Build conversation history context (excludes current message, already stored)
     const historyContext = this.memory.format(phone, name);
 
@@ -317,11 +332,29 @@ REGRAS:
 
     // 5a. Conversa — responder naturalmente, sem criar ticket
     if (intent.category === "conversa") {
-      let extraContext = "";
-      let contextTag = `💬 Conversa (${intent.intent}) — sem triagem`;
+      // Detectar saudacao que tambem pede novidades/status
+      const wantsStatus = intent.intent === "saudacao" && hasStatusIntent(text);
 
-      // Para status de processo, consultar o CRM primeiro
-      if (intent.intent === "status_processo") {
+      if (wantsStatus || intent.intent === "status_processo") {
+        // Auto-enviar acknowledgment directo ao cliente (sem aprovacao)
+        const ackResponse = await this.gemini.generateText(
+          CONVERSATION_PROMPT,
+          `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem: "${text}"${historyContext}\n\nINSTRUCAO ESPECIAL: O cliente quer saber novidades. Responde com um cumprimento caloroso e diz que vais verificar o estado do processo. NAO inventes informacao — diz apenas que vais consultar e que voltas ja.`
+        );
+
+        await this.gateway.sendMessage(phone, ackResponse);
+        this.memory.add(phone, "out", ackResponse);
+        console.log(`[Webhook] ↑ Ack auto-enviado a ${name ?? phone}: "${ackResponse.substring(0, 60)}..."`);
+
+        // Notificar grupo de controlo que o ack foi enviado
+        if (this.controlGroupJid) {
+          await this.gateway.sendToGroup(
+            this.controlGroupJid,
+            `⚡ *ACK AUTO-ENVIADO* a ${name ?? phone}:\n"${ackResponse.substring(0, 200)}${ackResponse.length > 200 ? "..." : ""}"`
+          );
+        }
+
+        // Consultar CRM para follow-up
         const processos = await this.crm.getClientProcesses(resolved.clienteId);
 
         if (processos.length > 0) {
@@ -336,22 +369,43 @@ REGRAS:
             })
             .join("\n");
 
-          extraContext = `\n\nINFORMACAO DO CRM (usar para responder ao cliente de forma acessivel, sem jargao — nunca mostrar IDs nem dados internos):\n${info}`;
-          contextTag = `📂 Status processo — ${processos.length} processo(s) encontrado(s)`;
-        } else {
-          extraContext = `\n\nINFORMACAO DO CRM: Nenhum processo encontrado para este cliente. Informar que vais verificar com a equipa.`;
-          contextTag = `📂 Status processo — nenhum processo encontrado`;
+          const followUpResponse = await this.gemini.generateText(
+            CONVERSATION_PROMPT,
+            `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem original: "${text}"\n\nINFORMACAO DO CRM (apresentar de forma acessivel, sem jargao — nunca mostrar IDs nem dados internos):\n${info}\n\nINSTRUCAO ESPECIAL: Ja cumprimentaste o cliente na mensagem anterior e disseste que ias verificar. Agora apresenta as novidades do processo de forma clara e acessivel. Nao repitas o cumprimento.${historyContext}`
+          );
+
+          return {
+            response: followUpResponse,
+            context: `📂 Follow-up status — ${processos.length} processo(s) encontrado(s)`,
+          };
         }
+
+        // Sem processos no CRM — pedir orientacao ao superior
+        if (this.controlGroupJid) {
+          await this.gateway.sendToGroup(
+            this.controlGroupJid,
+            `⚠️ *ORIENTAÇÃO NECESSÁRIA*\n━━━━━━━━━━━━━━━━━━━━\n*Cliente:* ${name ?? "Desconhecido"} (${phone})\n*Mensagem:* "${text}"\n━━━━━━━━━━━━━━━━━━━━\nNão encontrei processos no CRM para este cliente.\nJá enviei um ack a dizer que vou verificar.\n\n*Dr. Eduardo, como devo responder?*`
+          );
+        }
+        console.log(`[Webhook] ⚠️ Sem processos no CRM para ${name ?? phone} — pedido orientação ao superior`);
+
+        // Não submeter rascunho — aguardar instrução do superior
+        return {
+          response: "",
+          context: `📂 Status processo — sem processos, orientação pedida ao superior`,
+          skipDraft: true,
+        };
       }
 
+      // Conversa normal (saudacao, agradecimento, conversa_geral)
       const response = await this.gemini.generateText(
         CONVERSATION_PROMPT,
-        `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem: "${text}"${extraContext}${historyContext}`
+        `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem: "${text}"${historyContext}`
       );
 
       return {
         response,
-        context: contextTag,
+        context: `💬 Conversa (${intent.intent}) — sem triagem`,
       };
     }
 

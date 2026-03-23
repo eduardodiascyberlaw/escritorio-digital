@@ -186,6 +186,14 @@ async function detectByLlm(
 // ─── API publica ───
 
 /**
+ * Verifica se o texto contem padrao de pedido de status/novidade.
+ * Util para detectar intencao composta (saudacao + status).
+ */
+export function hasStatusIntent(text: string): boolean {
+  return STATUS_PATTERNS.some((p) => p.test(text));
+}
+
+/**
  * Detecta a intencao da mensagem.
  * Tenta primeiro por padroes (gratis). Se ambiguo, usa Gemini.
  */
