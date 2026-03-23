@@ -50,6 +50,7 @@ export function createTriagemTicket(
       conflito_interesses_verificado: false, // Rex will verify
       classificacao_area: classification.classificacao.area,
       classificacao_sub_tipo: classification.classificacao.sub_tipo,
+      servico_tipo: classification.classificacao.sub_tipo,
       dados_em_falta_nivel2: nivel2Complete
         ? []
         : classification.dados_em_falta,

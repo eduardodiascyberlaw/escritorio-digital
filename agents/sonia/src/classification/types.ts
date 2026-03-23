@@ -1,4 +1,4 @@
-import type { Materia } from "@sd-legal/shared";
+import type { Materia, ServicoTipo } from "@sd-legal/shared";
 
 export interface ClassificationResult {
   identificacao: {
@@ -8,7 +8,7 @@ export interface ClassificationResult {
   };
   classificacao: {
     area: Materia;
-    sub_tipo: string;
+    sub_tipo: ServicoTipo;
     urgencia: "urgente" | "normal" | "baixa";
     indicadores_prazo: string[];
   };

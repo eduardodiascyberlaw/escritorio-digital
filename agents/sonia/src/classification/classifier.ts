@@ -1,7 +1,37 @@
+import type { ServicoTipo } from "@sd-legal/shared";
 import type { GeminiClient } from "../llm/gemini-client.js";
 import { CLASSIFICATION_PROMPT } from "../llm/prompts.js";
 import type { WhatsAppHistory } from "../whatsapp/types.js";
 import type { ClassificationResult } from "./types.js";
+
+const SERVICO_TIPOS_VALIDOS: ReadonlySet<ServicoTipo> = new Set([
+  "pedido_ar",
+  "renovacao_ar",
+  "nacionalidade_pt",
+  "emissao_nif",
+  "constituicao_empresa",
+  "abertura_actividade",
+  "processo_laboral",
+  "recurso_ar_indeferida",
+  "suspensao_saida_voluntaria",
+  "casamento_portugal",
+  "casamento_brasil",
+  "divorcio_portugal",
+  "divorcio_brasil",
+  "revisao_sentenca_pt",
+  "homologacao_sentenca_br",
+  "injuncao_pagamento",
+  "insolvencia_empresa",
+  "insolvencia_pessoal",
+  "outro",
+]);
+
+function validarServicoTipo(valor: unknown): ServicoTipo {
+  if (typeof valor === "string" && SERVICO_TIPOS_VALIDOS.has(valor as ServicoTipo)) {
+    return valor as ServicoTipo;
+  }
+  return "outro";
+}
 
 export async function classifyConversation(
   history: WhatsAppHistory,
@@ -31,7 +61,7 @@ export async function classifyConversation(
       },
       classificacao: {
         area: result.classificacao?.area ?? "outro",
-        sub_tipo: result.classificacao?.sub_tipo ?? "",
+        sub_tipo: validarServicoTipo(result.classificacao?.sub_tipo),
         urgencia: result.classificacao?.urgencia ?? "normal",
         indicadores_prazo: result.classificacao?.indicadores_prazo ?? [],
       },
@@ -46,7 +76,7 @@ export async function classifyConversation(
       identificacao: { nome: null, dados_pessoais: {}, lingua: "pt" },
       classificacao: {
         area: "outro",
-        sub_tipo: "",
+        sub_tipo: "outro",
         urgencia: "normal",
         indicadores_prazo: [],
       },
