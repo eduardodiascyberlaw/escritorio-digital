@@ -60,6 +60,10 @@ services:
       - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-europe-west4}
       - GEMINI_MODEL_FLASH=${GEMINI_MODEL_FLASH:-gemini-2.5-flash}
       - OBSIDIAN_VAULT_PATH=/app/obsidian-vault
+      - WA_PROVIDER=${WA_PROVIDER:-zapi}
+      - ZAPI_INSTANCE_ID=${ZAPI_INSTANCE_ID}
+      - ZAPI_TOKEN=${ZAPI_TOKEN}
+      - ZAPI_CLIENT_TOKEN=${ZAPI_CLIENT_TOKEN}
       - EVOLUTION_API_URL=http://host.docker.internal:8080
       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY}
       - EVOLUTION_INSTANCE=${EVOLUTION_INSTANCE:-sd-legal}
