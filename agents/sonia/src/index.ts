@@ -65,7 +65,7 @@ const tts = new ElevenLabsTts({
   voiceId: config.elevenlabsVoiceId,
 });
 
-const supervised = new SupervisedMode(gateway, CONTROL_GROUP_NAME, tts);
+const supervised = new SupervisedMode(gateway, CONTROL_GROUP_NAME, tts, vaultWriter);
 
 // ─────────────────────────────────────────────
 // Servidor HTTP (recebe webhooks da Evolution API)

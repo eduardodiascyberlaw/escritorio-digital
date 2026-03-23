@@ -21,6 +21,11 @@ export interface AuthorizedSuperior {
  *   SONIA_SUPERIOR_CAROL=+351...
  *   SONIA_SUPERIOR_MARI=+351...
  */
+/** Remove espacos, hifen e garante formato +XXXXXXXXXXX */
+function normalizePhone(raw: string): string {
+  return raw.replace(/[\s\-()]/g, "").replace(/^(\d)/, "+$1");
+}
+
 export function loadSuperiors(): AuthorizedSuperior[] {
   const superiors: AuthorizedSuperior[] = [];
 
@@ -31,7 +36,7 @@ export function loadSuperiors(): AuthorizedSuperior[] {
       referencia: "Dr. Eduardo",
       cargo: "chefe",
       nivel: 3,
-      phone: eduardo,
+      phone: normalizePhone(eduardo),
     });
   }
 
@@ -42,7 +47,7 @@ export function loadSuperiors(): AuthorizedSuperior[] {
       referencia: "Dona Carol",
       cargo: "superiora",
       nivel: 2,
-      phone: carol,
+      phone: normalizePhone(carol),
     });
   }
 
@@ -53,7 +58,7 @@ export function loadSuperiors(): AuthorizedSuperior[] {
       referencia: "Mari",
       cargo: "colega",
       nivel: 1,
-      phone: mari,
+      phone: normalizePhone(mari),
     });
   }
 
@@ -67,8 +72,8 @@ export function identifySuperior(
   phone: string,
   superiors: AuthorizedSuperior[]
 ): AuthorizedSuperior | null {
-  // Normalizar: remover @s.whatsapp.net e garantir +
-  const normalized = phone.replace(/@.*$/, "").replace(/^(\d)/, "+$1");
+  // Normalizar: remover @s.whatsapp.net, espacos, e garantir +
+  const normalized = normalizePhone(phone.replace(/@.*$/, ""));
 
   return (
     superiors.find(
