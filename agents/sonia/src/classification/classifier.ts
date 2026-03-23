@@ -7,6 +7,7 @@ import type { ClassificationResult } from "./types.js";
 const SERVICO_TIPOS_VALIDOS: ReadonlySet<ServicoTipo> = new Set([
   "pedido_ar",
   "renovacao_ar",
+  "reagrupamento_familiar",
   "nacionalidade_pt",
   "emissao_nif",
   "constituicao_empresa",

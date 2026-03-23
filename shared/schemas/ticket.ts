@@ -51,6 +51,7 @@ export type UrgenciaProcessual = "cautelar" | "prazo_curto" | "normal";
 export type ServicoTipo =
   | "pedido_ar"
   | "renovacao_ar"
+  | "reagrupamento_familiar"
   | "nacionalidade_pt"
   | "emissao_nif"
   | "constituicao_empresa"

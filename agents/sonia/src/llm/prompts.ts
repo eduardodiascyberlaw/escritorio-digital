@@ -24,7 +24,7 @@ export const CLASSIFICATION_PROMPT = buildPrompt(
 2. CLASSIFICACAO DO CASO
    - Area: imigracao | laboral | administrativo | familia | nacionalidade | outro
    - Sub-tipo especifico (escolhe o mais adequado):
-     pedido_ar | renovacao_ar | nacionalidade_pt | emissao_nif |
+     pedido_ar | renovacao_ar | reagrupamento_familiar | nacionalidade_pt | emissao_nif |
      constituicao_empresa | abertura_actividade | processo_laboral |
      recurso_ar_indeferida | suspensao_saida_voluntaria |
      casamento_portugal | casamento_brasil | divorcio_portugal | divorcio_brasil |

@@ -51,15 +51,20 @@ const STATUS_PATTERNS = [
 ];
 
 const CASE_PATTERNS = [
-  /(preciso|quero|gostaria|necessito).*(advogado|advogar|processo|consulta|requeri)/i,
+  /(preciso|quero|gostaria|necessito).*(advogado|advogar|processo|consulta|requeri|ajuda|tratar|fazer|resolver)/i,
   /(autoriza[cç][aã]o|titulo|resid[eê]ncia|renova|visto|nif|nacionalidade)/i,
+  /(reagrupamento|reunifica[cç][aã]o)\s*(familiar)?/i,
   /(despedi|demiti|trabalho|contrato|patr[aã]o|empregador)/i,
   /(casamento|div[oó]rcio|separa[cç][aã]o)/i,
   /(empresa|actividade|constituir|abrir)/i,
-  /(insolvência|dívida|injun[cç][aã]o|cobran[cç]a)/i,
+  /(insolv[eê]ncia|d[ií]vida|injun[cç][aã]o|cobran[cç]a)/i,
   /(recurso|impugna|contesta|indeferid)/i,
-  /(urgente|urgência|prazo|deport|detid)/i,
+  /(urgente|urg[eê]ncia|prazo|deport|detid)/i,
   /(senten[cç]a|homologa|revis[aã]o)/i,
+  /(aima|sef|fronteira|expuls[aã]o|permanência)/i,
+  /(apoio\s*judici[aá]rio|custas|honor[aá]rios)/i,
+  /(heran[cç]a|invent[aá]rio|partilha)/i,
+  /(guarda|pens[aã]o\s*aliment|regula[cç][aã]o.*parental)/i,
 ];
 
 const DOCUMENT_PATTERNS = [
