@@ -26,6 +26,8 @@ import { escalateToHuman } from "../escalation/escalation.js";
 import type { ChamadoHumano } from "../escalation/types.js";
 import { StubProJurisAdapter } from "../client/projuris-adapter.js";
 import { StubDriveAdapter } from "../client/drive-adapter.js";
+import { detectIntent } from "../conversation/intent-detector.js";
+import { CONVERSATION_PROMPT } from "../llm/prompts.js";
 
 // Evolution API webhook payload types
 interface WebhookMessage {
@@ -300,7 +302,23 @@ REGRAS:
       };
     }
 
-    // 5. Classify and generate response
+    // 5. Detect intent — conversa ou triagem?
+    const intent = await detectIntent(text, name, this.gemini);
+
+    // 5a. Conversa — responder naturalmente, sem criar ticket
+    if (intent.category === "conversa") {
+      const response = await this.gemini.generateText(
+        CONVERSATION_PROMPT,
+        `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem: "${text}"`
+      );
+
+      return {
+        response,
+        context: `💬 Conversa (${intent.intent}) — sem triagem`,
+      };
+    }
+
+    // 5b. Triagem — classificar e criar ticket para o Rex
     const miniHistory = {
       numero_cliente: phone,
       periodo: {
@@ -335,12 +353,15 @@ REGRAS:
       await this.paperclip.submitTicket(ticket);
     }
 
-    const nomeCliente = name ?? "";
-    const saudacao = nomeCliente ? `${nomeCliente}, o` : "O";
+    // Gerar resposta conversacional (mesmo na triagem, ser humana)
+    const response = await this.gemini.generateText(
+      CONVERSATION_PROMPT,
+      `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem: "${text}"\n\nCONTEXTO INTERNO (nao mencionar ao cliente): O caso foi registado como ${classification.classificacao.area} / ${classification.classificacao.sub_tipo}. A equipa vai analisar.`
+    );
 
     return {
-      response: `${saudacao} seu caso foi registado e ja estou encaminhando para analise pela equipa do escritorio. Assim que houver novidades, entro em contacto!`,
-      context: `📌 Classificacao: ${classification.classificacao.area} / ${classification.classificacao.sub_tipo} / ${classification.classificacao.urgencia} — Intencao: ${classification.intencao}`,
+      response,
+      context: `📌 Triagem: ${classification.classificacao.area} / ${classification.classificacao.sub_tipo} / ${classification.classificacao.urgencia} — Intencao: ${classification.intencao}`,
     };
   }
 
