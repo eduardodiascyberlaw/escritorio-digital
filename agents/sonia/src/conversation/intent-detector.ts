@@ -84,20 +84,46 @@ const STATUS_PATTERNS = [
 ];
 
 const CASE_PATTERNS = [
+  // Intencao generica de contratar servico
   /(preciso|quero|gostaria|necessito).*(advogado|advogar|processo|consulta|requeri|ajuda|tratar|fazer|resolver)/i,
+  // Imigracao — termos formais
   /(autoriza[cç][aã]o|titulo|resid[eê]ncia|renova|visto|nif|nacionalidade)/i,
   /(reagrupamento|reunifica[cç][aã]o)\s*(familiar)?/i,
+  /(aima|sef|fronteira|expuls[aã]o|permanência)/i,
+  // Imigracao — termos coloquiais usados por clientes
+  /(legaliz|regulariz|manifesta[cç][aã]o\s*de\s*interesse)/i,
+  /(agendamento|marca[cç][aã]o).*(aima|sef|consulad)/i,
+  /(cplp|lusofon|palop)/i,
+  /(sa[ií]da\s*volunt[aá]ria|volunt[aá]ria)/i,
+  // Laboral
   /(despedi|demiti|trabalho|contrato|patr[aã]o|empregador)/i,
+  /(acidente\s*de\s*trabalho|baixa\s*m[eé]dica)/i,
+  /(subs[ií]dio|seguran[cç]a\s*social|niss)/i,
+  // Familia
   /(casamento|div[oó]rcio|separa[cç][aã]o)/i,
+  /(guarda|pens[aã]o\s*aliment|regula[cç][aã]o.*parental)/i,
+  /(viol[eê]ncia\s*dom[eé]stica|maus\s*tratos)/i,
+  // Empresarial
   /(empresa|actividade|constituir|abrir)/i,
+  // Financeiro / dividas
   /(insolv[eê]ncia|d[ií]vida|injun[cç][aã]o|cobran[cç]a)/i,
+  /(penhora|hipoteca|execu[cç][aã]o)/i,
+  // Contencioso / tribunal
   /(recurso|impugna|contesta|indeferid)/i,
   /(urgente|urg[eê]ncia|prazo|deport|detid)/i,
   /(senten[cç]a|homologa|revis[aã]o)/i,
-  /(aima|sef|fronteira|expuls[aã]o|permanência)/i,
+  /(tribunal|audi[eê]ncia|cita[cç][aã]o|citado|notificad)/i,
+  /(queixa|den[uú]ncia|queixar)/i,
+  // Custas e apoio
   /(apoio\s*judici[aá]rio|custas|honor[aá]rios)/i,
+  // Sucessoes
   /(heran[cç]a|invent[aá]rio|partilha)/i,
-  /(guarda|pens[aã]o\s*aliment|regula[cç][aã]o.*parental)/i,
+  /(habilita[cç][aã]o\s*de\s*herdeiros)/i,
+  // Documentos legais (nao simples upload, mas necessidade juridica)
+  /(procura[cç][aã]o|apostil[ah]|tradu[cç][aã]o\s*jura)/i,
+  /(transcri[cç][aã]o|averbamento|registo\s*criminal)/i,
+  // Habitacao
+  /(despejo|arrendamento|senhorio|inquilino)/i,
 ];
 
 const DOCUMENT_PATTERNS = [
