@@ -9,6 +9,9 @@ import { AudioTranscriber } from "../stt/audio-transcriber.js";
 
 import { checkDeontologicalLimits } from "../rules/deontological.js";
 import { DISCLAIMER, ESCALATION_RESPONSE_TEMPLATE } from "../identity/persona.js";
+import { isOutsideHours, OUT_OF_HOURS_MESSAGE } from "../schedule/business-hours.js";
+import { addOvernightMessage } from "../schedule/morning-routine.js";
+import { trackEvent } from "../schedule/daily-report.js";
 import { resolveClient } from "../client/resolver.js";
 import { validateNivel1 } from "../client/nivel-validator.js";
 import {
@@ -139,6 +142,34 @@ export class WebhookHandler {
     console.log(
       `[Webhook] ← ${pushName ?? phone}${isAudioMessage ? " 🎤" : ""}: ${text.substring(0, 60)}...`
     );
+
+    // Track message received
+    trackEvent({
+      timestamp: new Date().toISOString(),
+      clientPhone: phone,
+      clientName: pushName,
+      type: "message_received",
+      detail: text.substring(0, 80),
+    });
+
+    // Check business hours — outside hours, queue for morning routine
+    if (isOutsideHours()) {
+      addOvernightMessage({
+        phone,
+        name: pushName,
+        text,
+        receivedAt: new Date().toISOString(),
+      });
+
+      await this.supervised.submitDraft(
+        phone,
+        pushName,
+        text,
+        OUT_OF_HOURS_MESSAGE,
+        "🌙 Fora do horario de trabalho — resposta automatica"
+      );
+      return;
+    }
 
     // Process the message and generate a draft response
     try {

@@ -158,7 +158,7 @@ async function start(): Promise<void> {
   });
 
   // Start heartbeat
-  startHeartbeat({ gateway, crm });
+  startHeartbeat({ gateway, crm, supervised, controlGroupJid });
 
   // Start HTTP server
   server.listen(PORT, () => {
