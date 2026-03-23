@@ -29,6 +29,7 @@ import { StubDriveAdapter } from "../client/drive-adapter.js";
 import { detectIntent, hasStatusIntent } from "../conversation/intent-detector.js";
 import { CONVERSATION_PROMPT } from "../llm/prompts.js";
 import type { ConversationMemory } from "../conversation/conversation-memory.js";
+import { MessageBatcher } from "../conversation/message-batcher.js";
 
 // Evolution API webhook payload types
 interface WebhookMessage {
@@ -66,6 +67,7 @@ export class WebhookHandler {
   private memory: ConversationMemory;
   private transcriber: AudioTranscriber;
   private controlGroupJid: string | null = null;
+  private batcher: MessageBatcher;
 
   // Track consent state (in-memory; move to CRM later)
   private consentState = new Map<
@@ -94,6 +96,9 @@ export class WebhookHandler {
     this.memory = deps.memory;
     this.controlGroupJid = deps.controlGroupJid;
     this.transcriber = new AudioTranscriber(deps.gemini);
+    this.batcher = new MessageBatcher(30_000, (phone, name, text, hasAudio) =>
+      this.processBatch(phone, name, text, hasAudio)
+    );
   }
 
   async handleWebhook(payload: WebhookPayload): Promise<void> {
@@ -162,21 +167,35 @@ export class WebhookHandler {
       detail: text.substring(0, 80),
     });
 
-    // Store incoming message in conversation memory
+    // Store incoming message in conversation memory (each msg individually)
     this.memory.add(phone, "in", text);
 
+    // Add to batcher — will be processed after 30s of inactivity
+    this.batcher.add(phone, pushName, text, isAudioMessage);
+  }
+
+  /**
+   * Chamado pelo batcher quando a janela de 30s expira.
+   * Recebe o texto concatenado de todas as mensagens do cliente.
+   */
+  private async processBatch(
+    phone: string,
+    name: string | null,
+    text: string,
+    hasAudio: boolean
+  ): Promise<void> {
     // Check business hours — outside hours, queue for morning routine
     if (isOutsideHours()) {
       addOvernightMessage({
         phone,
-        name: pushName,
+        name,
         text,
         receivedAt: new Date().toISOString(),
       });
 
       await this.supervised.submitDraft(
         phone,
-        pushName,
+        name,
         text,
         OUT_OF_HOURS_MESSAGE,
         "🌙 Fora do horario de trabalho — resposta automatica"
@@ -184,25 +203,25 @@ export class WebhookHandler {
       return;
     }
 
-    // Process the message and generate a draft response
+    // Process the batched message and generate a draft response
     try {
       const { response, context: baseContext, followUp, skipDraft } = await this.processMessage(
         phone,
-        pushName,
+        name,
         text
       );
 
       // Some flows handle sending directly (e.g. ack auto-sent + orientation requested)
       if (skipDraft) return;
 
-      const context = isAudioMessage
+      const context = hasAudio
         ? `🎤 Áudio transcrito: "${text.substring(0, 100)}${text.length > 100 ? "..." : ""}"\n${baseContext}`
         : baseContext;
 
       // Submit draft for human approval
       await this.supervised.submitDraft(
         phone,
-        pushName,
+        name,
         text,
         response,
         context
@@ -212,7 +231,7 @@ export class WebhookHandler {
       if (followUp) {
         await this.supervised.submitDraft(
           phone,
-          pushName,
+          name,
           text,
           followUp.response,
           followUp.context
@@ -225,7 +244,7 @@ export class WebhookHandler {
       if (this.controlGroupJid) {
         await this.gateway.sendToGroup(
           this.controlGroupJid,
-          `⚠️ *ERRO* ao processar mensagem de ${pushName ?? phone}:\n${text.substring(0, 100)}...\n\nErro: ${error instanceof Error ? error.message : "desconhecido"}\n\n_Responder manualmente._`
+          `⚠️ *ERRO* ao processar mensagem de ${name ?? phone}:\n${text.substring(0, 100)}...\n\nErro: ${error instanceof Error ? error.message : "desconhecido"}\n\n_Responder manualmente._`
         );
       }
     }
