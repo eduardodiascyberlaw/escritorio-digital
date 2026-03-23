@@ -212,6 +212,9 @@ export class WebhookHandler {
       return;
     }
 
+    // Indicador de digitacao — mostra "a escrever..." ao cliente enquanto processa
+    await this.gateway.sendPresence(phone, "composing");
+
     // Process the batched message and generate a draft response
     try {
       const { response, context: baseContext, followUp, skipDraft } = await this.processMessage(
@@ -219,6 +222,8 @@ export class WebhookHandler {
         name,
         text
       );
+
+      await this.gateway.sendPresence(phone, "paused");
 
       // Some flows handle sending directly (e.g. ack auto-sent + orientation requested)
       if (skipDraft) return;
@@ -247,6 +252,7 @@ export class WebhookHandler {
         );
       }
     } catch (error) {
+      await this.gateway.sendPresence(phone, "paused");
       console.error(`[Webhook] Erro ao processar mensagem:`, error);
 
       // Notify control group about the error

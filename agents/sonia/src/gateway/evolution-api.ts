@@ -63,6 +63,30 @@ export class EvolutionApiGateway implements WhatsAppGateway {
     }
   }
 
+  /** Envia indicador de presenca (composing = a escrever, paused = parou). */
+  async sendPresence(phone: string, state: "composing" | "paused"): Promise<void> {
+    const jid = this.toJid(phone);
+
+    try {
+      await fetch(
+        `${this.config.baseUrl}/chat/sendPresence/${this.config.instanceName}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: this.config.apiKey,
+          },
+          body: JSON.stringify({
+            number: jid,
+            presence: state,
+          }),
+        }
+      );
+    } catch {
+      // Falha silenciosa — typing indicator nao e critico
+    }
+  }
+
   async getUnreadMessages(): Promise<IncomingMessage[]> {
     // Messages arrive via webhook, not polling
     return [];
