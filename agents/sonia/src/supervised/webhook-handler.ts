@@ -255,14 +255,34 @@ export class WebhookHandler {
       await this.gateway.sendPresence(phone, "paused");
       console.error(`[Webhook] Erro ao processar mensagem:`, error);
 
-      // Notify control group about the error
-      if (this.controlGroupJid) {
-        await this.gateway.sendToGroup(
-          this.controlGroupJid,
-          `⚠️ *ERRO* ao processar mensagem de ${name ?? phone}:\n${text.substring(0, 100)}...\n\nErro: ${error instanceof Error ? error.message : "desconhecido"}\n\n_Responder manualmente._`
-        );
-      }
+      const errorMsg = error instanceof Error ? error.message : "desconhecido";
+
+      // Submeter rascunho fallback para aprovacao humana
+      const fallback = this.getFallbackMessage(phone, name);
+      await this.supervised.submitDraft(
+        phone,
+        name,
+        text,
+        fallback,
+        `🔴 FALLBACK LLM — Erro: ${errorMsg}\n_Mensagem pre-escrita. Editar se necessario._`
+      );
     }
+  }
+
+  /** Mensagens fallback quando o LLM falha — por lingua, com placeholder {nome} para personalizar. */
+  private static FALLBACK_TEMPLATES: Record<string, string> = {
+    pt: "Oi{nome}! Recebi sua mensagem sim 😊 Deixa eu verificar aqui com a equipe e ja te retorno, tudo bem?",
+    en: "Hi{nome}! Got your message 😊 Let me check with the team and I'll get right back to you, okay?",
+    fr: "Bonjour{nome} ! J'ai bien recu votre message 😊 Je verifie avec l'equipe et je reviens vers vous tres vite.",
+    cv: "Oi{nome}! N risebi bos mensajen 😊 N ta conferí ku ekipa i N ta volta logu, tá?",
+  };
+
+  /** Retorna mensagem fallback na lingua do cliente, personalizada com nome. */
+  private getFallbackMessage(phone: string, clientName: string | null): string {
+    const lang = this.memory.getLanguage(phone) ?? "pt";
+    const template = WebhookHandler.FALLBACK_TEMPLATES[lang] ?? WebhookHandler.FALLBACK_TEMPLATES.pt;
+    const nome = clientName ? `, ${clientName.split(" ")[0]}` : "";
+    return template.replace("{nome}", nome);
   }
 
   private static LANGUAGE_NAMES: Record<string, string> = {
