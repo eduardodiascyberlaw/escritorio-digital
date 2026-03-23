@@ -69,6 +69,10 @@ export class WebhookHandler {
   private controlGroupJid: string | null = null;
   private batcher: MessageBatcher;
 
+  // Dedup: ignore duplicate webhook deliveries (TTL 5 min)
+  private seenMessages = new Map<string, number>();
+  private static DEDUP_TTL_MS = 5 * 60 * 1000;
+
   // Track consent state (in-memory; move to CRM later)
   private consentState = new Map<
     string,
@@ -105,6 +109,12 @@ export class WebhookHandler {
     // Only process incoming messages
     if (payload.event !== "messages.upsert") return;
     if (payload.data.key.fromMe) return;
+
+    // Deduplicate webhook deliveries
+    const messageId = payload.data.key.id;
+    if (this.seenMessages.has(messageId)) return;
+    this.seenMessages.set(messageId, Date.now());
+    this.pruneSeenMessages();
 
     const remoteJid = payload.data.key.remoteJid;
     const phone = this.jidToPhone(remoteJid);
@@ -520,5 +530,14 @@ REGRAS:
   private jidToPhone(jid: string): string {
     // "351935267262@s.whatsapp.net" → "+351935267262"
     return "+" + jid.split("@")[0];
+  }
+
+  /** Remove entradas de dedup com mais de 5 minutos. */
+  private pruneSeenMessages(): void {
+    if (this.seenMessages.size < 100) return;
+    const cutoff = Date.now() - WebhookHandler.DEDUP_TTL_MS;
+    for (const [id, ts] of this.seenMessages) {
+      if (ts < cutoff) this.seenMessages.delete(id);
+    }
   }
 }
