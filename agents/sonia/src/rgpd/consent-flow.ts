@@ -35,17 +35,17 @@ export async function sendConsentRequest(
   );
   const consentText =
     codeBlockMatch?.[1] ??
-    `O escritório SD Legal solicita o vosso consentimento para:
+    `O escritorio SD Legal solicita o seu consentimento para:
 
-✅ Tratamento dos vossos dados pessoais para prestação de serviços jurídicos
-✅ Partilha com tribunais e entidades administrativas quando necessário
-✅ Conservação dos dados durante o período legal obrigatório após conclusão do processo
+✅ Tratamento dos seus dados pessoais para prestacao de servicos juridicos
+✅ Partilha com tribunais e entidades administrativas quando necessario
+✅ Conservacao dos dados durante o periodo legal obrigatorio apos conclusao do processo
 
 Opcional:
-☐ Recepção de informações sobre serviços e novidades do escritório
+☐ Receber informacoes sobre servicos e novidades do escritorio
 
-Para confirmar, respondam SIM.
-Para recusar qualquer ponto, indiquem qual.`;
+Para confirmar, responda SIM.
+Para recusar algum ponto, indique qual.`;
 
   await gateway.sendMessage(phone, consentText);
 }
@@ -66,7 +66,7 @@ export function processConsentResponse(response: string): ConsentResult {
       },
       escalateToHuman: false,
       responseToClient:
-        "Obrigado. O vosso consentimento ficou registado. Vamos avançar com o vosso caso.",
+        "Obrigada! O seu consentimento ficou registado. Vamos avancar com o seu caso!",
     };
   }
 
@@ -75,7 +75,7 @@ export function processConsentResponse(response: string): ConsentResult {
       state: "recusado",
       escalateToHuman: true,
       responseToClient:
-        "Compreendemos. Sem o vosso consentimento não nos é possível prestar serviços jurídicos. Se mudarem de ideias, estamos disponíveis.",
+        "Compreendo. Sem o consentimento nao nos e possivel prestar servicos juridicos. Se mudar de ideia, estamos a disposicao!",
     };
   }
 
@@ -84,7 +84,7 @@ export function processConsentResponse(response: string): ConsentResult {
     state: "recusa_parcial",
     escalateToHuman: true,
     responseToClient:
-      "Obrigado pela resposta. Vamos analisar os pontos que indicou e o Dr. Eduardo vai contactá-lo(a) para esclarecer.",
+      "Obrigada pela resposta! Vou verificar com um colega do escritorio sobre os pontos que indicou e volto com uma resposta, tudo bem?",
   };
 }
 

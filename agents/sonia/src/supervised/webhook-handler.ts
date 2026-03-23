@@ -8,7 +8,7 @@ import type { EvolutionApiGateway } from "../gateway/evolution-api.js";
 import { AudioTranscriber } from "../stt/audio-transcriber.js";
 
 import { checkDeontologicalLimits } from "../rules/deontological.js";
-import { DISCLAIMER } from "../llm/prompts.js";
+import { DISCLAIMER, ESCALATION_RESPONSE_TEMPLATE } from "../identity/persona.js";
 import { resolveClient } from "../client/resolver.js";
 import { validateNivel1 } from "../client/nivel-validator.js";
 import {
@@ -181,8 +181,8 @@ export class WebhookHandler {
     const deontoCheck = checkDeontologicalLimits(text);
     if (deontoCheck.mustEscalate) {
       return {
-        response: `Obrigado pela sua questão. Vou encaminhar para o Dr. Eduardo que poderá dar-lhe uma resposta mais precisa.\n\n${DISCLAIMER}`,
-        context: `⚠️ ESCALAMENTO DEONTOLÓGICO: ${deontoCheck.reason}`,
+        response: ESCALATION_RESPONSE_TEMPLATE(name),
+        context: `⚠️ ESCALAMENTO DEONTOLOGICO: ${deontoCheck.reason}`,
       };
     }
 
@@ -243,13 +243,20 @@ export class WebhookHandler {
     // 4. Check onboarding completeness
     const validation = validateNivel1(resolved.data);
     if (!validation.complete) {
+      const { buildPrompt } = await import("../identity/prompt-builder.js");
+      const onboardingPrompt = buildPrompt(
+        `TAREFA: Estas a recolher dados de um cliente. Faltam estes campos: ${validation.missing.join(", ")}.
+O perfil esta ${validation.percentagem}% completo.
+REGRAS:
+- Pede no maximo 2 dados por mensagem.
+- Sempre trata o cliente por Sr./Sra. + primeiro nome.
+- Tom profissional mas caloroso.
+- Nao des pareceres juridicos.`
+      );
+
       const response = await this.gemini.generateText(
-        `És a Sónia, recepcionista do escritório SD Legal.
-Estás a recolher dados de um cliente. Faltam estes campos: ${validation.missing.join(", ")}.
-O perfil está ${validation.percentagem}% completo.
-REGRA: pede no máximo 2 dados por mensagem. Tom profissional e acolhedor. Tratamento formal (vosso).
-Não uses emojis em excesso. Não dês pareceres jurídicos.`,
-        `Nome do cliente: ${name ?? "desconhecido"}\nMensagem: "${text}"\nDados já recolhidos: ${JSON.stringify(resolved.data, null, 2)}`
+        onboardingPrompt,
+        `Nome do cliente: ${name ?? "desconhecido"}\nMensagem: "${text}"\nDados ja recolhidos: ${JSON.stringify(resolved.data, null, 2)}`
       );
 
       return {
@@ -293,9 +300,12 @@ Não uses emojis em excesso. Não dês pareceres jurídicos.`,
       await this.paperclip.submitTicket(ticket);
     }
 
+    const nomeCliente = name ?? "";
+    const saudacao = nomeCliente ? `${nomeCliente}, o` : "O";
+
     return {
-      response: `Obrigado, ${name ?? ""}. O vosso caso (${classification.classificacao.area}) foi registado e encaminhado para análise. Entraremos em contacto em breve.`,
-      context: `📌 Classificação: ${classification.classificacao.area} / ${classification.classificacao.urgencia} — Intenção: ${classification.intencao}`,
+      response: `${saudacao} seu caso foi registado e ja estou encaminhando para analise pela equipa do escritorio. Assim que houver novidades, entro em contacto!`,
+      context: `📌 Classificacao: ${classification.classificacao.area} / ${classification.classificacao.sub_tipo} / ${classification.classificacao.urgencia} — Intencao: ${classification.intencao}`,
     };
   }
 

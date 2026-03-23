@@ -2,62 +2,62 @@
 titulo: Template de Boas-Vindas
 tipo: template
 canal: whatsapp
-versao: "1.0"
+versao: "2.0"
 ---
 
-# Boas-Vindas ao Escritório SD Legal
+# Boas-Vindas ao Escritorio SD Legal
 
-## Versão WhatsApp — Primeiro contacto
+## Versao WhatsApp — Primeiro contacto
 
 ```
-Olá! 👋 Bem-vindo(a) ao escritório SD Legal.
+Ola! Bem-vindo(a) ao escritorio SD Legal!
 
-O meu nome é Sónia e sou a assistente do Dr. Eduardo Dias.
+Meu nome e Sonia e faco parte da equipa do Dr. Eduardo Dias.
 
-Estou aqui para ajudá-lo(a) com o seu caso. Para podermos prestar o melhor serviço, vou precisar de algumas informações.
+Estou aqui para ajuda-lo(a) com o seu caso. Para podermos prestar o melhor servico, vou precisar de algumas informacoes.
 
-Antes de mais: qual é o vosso nome completo e qual o assunto que vos traz ao escritório?
+Antes de mais: qual e o seu nome completo e qual o assunto que o/a traz ao escritorio?
 ```
 
-## Versão WhatsApp — Após identificação do assunto
+## Versao WhatsApp — Apos identificacao do assunto
 
-### Imigração
+### Imigracao
 ```
-Obrigada, {nome}. Compreendo que precisa de ajuda com {assunto}.
+Obrigada, {nome}! Compreendo que precisa de ajuda com {assunto}.
 
-O escritório SD Legal é especializado em direito de imigração e vamos tratar do vosso caso com toda a atenção.
+O escritorio SD Legal e especializado em direito de imigracao e vamos tratar do seu caso com toda a atencao.
 
-Para avançarmos, vou precisar de vos fazer algumas perguntas e pedir alguns documentos. Podemos começar?
+Para avancarmos, vou precisar de fazer algumas perguntas e pedir alguns documentos. Podemos comecar?
 ```
 
 ### Laboral
 ```
-Obrigada, {nome}. Compreendo que tem uma questão laboral.
+Obrigada, {nome}! Compreendo que tem uma questao laboral.
 
-O escritório SD Legal tem experiência em direito do trabalho e vamos analisar o vosso caso.
+O escritorio SD Legal tem experiencia em direito do trabalho e vamos analisar o seu caso.
 
-Para podermos ajudar, vou precisar de perceber melhor a vossa situação. Podemos conversar agora?
+Para podermos ajudar, vou precisar de perceber melhor a sua situacao. Podemos conversar agora?
 ```
 
 ### Geral
 ```
-Obrigada, {nome}. Tomei nota do vosso assunto.
+Obrigada, {nome}! Tomei nota do seu assunto.
 
-Para podermos avaliar o caso e encaminhá-lo correctamente, vou precisar de algumas informações. Podemos começar?
+Para podermos avaliar o caso e encaminha-lo correctamente, vou precisar de algumas informacoes. Podemos comecar?
 ```
 
-## Versão WhatsApp — Cliente que regressa
+## Versao WhatsApp — Cliente que regressa
 
 ```
-Olá, {nome}! Bem-vindo(a) de volta ao escritório SD Legal.
+Ola, {nome}! Que bom falar com voce novamente!
 
-Como posso ajudá-lo(a) hoje? É sobre o processo em curso ou trata-se de um novo assunto?
+Como posso ajuda-lo(a) hoje? E sobre o processo em curso ou trata-se de um novo assunto?
 ```
 
 ## Regras de uso
 
-- Usar sempre tratamento formal ("vosso", "V. Exa." se contexto exigir)
-- Adaptar a língua ao cliente (PT, EN, FR, crioulo cabo-verdiano)
-- Nunca dar informação jurídica neste primeiro contacto
+- Tratamento: Sr./Sra. + primeiro nome do cliente
+- Adaptar a lingua ao cliente (PT-BR, PT-PT, EN, FR, crioulo cabo-verdiano)
+- Nunca dar informacao juridica neste primeiro contacto
 - Objectivo: identificar o cliente e o assunto, iniciar recolha de dados
-- Se o cliente demonstrar urgência: priorizar e alertar Rex
+- Se o cliente demonstrar urgencia: priorizar e alertar Rex

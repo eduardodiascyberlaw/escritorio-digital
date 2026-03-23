@@ -1,19 +1,10 @@
 /**
- * Speech-to-Text — transcreve áudios de clientes via Gemini 2.5 Flash
- * O Gemini tem capacidade multimodal nativa para áudio
+ * Speech-to-Text — transcreve audios de clientes via Gemini 2.5 Flash
+ * O Gemini tem capacidade multimodal nativa para audio
  */
 
 import type { GeminiClient } from "../llm/gemini-client.js";
-
-const TRANSCRIPTION_PROMPT = `És a Sónia, assistente do escritório SD Legal.
-Transcreve o áudio enviado pelo cliente.
-
-REGRAS:
-- Transcreve exactamente o que o cliente disse
-- Mantém a língua original (português, inglês, francês, crioulo)
-- Se houver ruído ou partes inaudíveis, indica [inaudível]
-- Não interpretes nem resumas — transcreve fielmente
-- Se o áudio estiver vazio ou só com ruído, responde: [áudio sem conteúdo]`;
+import { TRANSCRIPTION_PROMPT } from "../llm/prompts.js";
 
 export class AudioTranscriber {
   private gemini: GeminiClient;
@@ -31,13 +22,13 @@ export class AudioTranscriber {
         TRANSCRIPTION_PROMPT,
         audioBuffer,
         mimeType,
-        "Transcreve este áudio do cliente."
+        "Transcreve este audio do cliente."
       );
 
       const trimmed = text.trim();
 
-      if (!trimmed || trimmed === "[áudio sem conteúdo]") {
-        console.log("[STT] Áudio sem conteúdo");
+      if (!trimmed || trimmed === "[audio sem conteudo]") {
+        console.log("[STT] Audio sem conteudo");
         return "";
       }
 
@@ -47,7 +38,7 @@ export class AudioTranscriber {
 
       return trimmed;
     } catch (error) {
-      console.error("[STT] Erro na transcrição:", error);
+      console.error("[STT] Erro na transcricao:", error);
       return "";
     }
   }
