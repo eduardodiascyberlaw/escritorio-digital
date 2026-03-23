@@ -1,5 +1,5 @@
 import type { ClienteNivel1 } from "@sd-legal/shared";
-import type { CrmAdapter, IncompleteClient, OnboardingState } from "./crm-adapter.js";
+import type { CrmAdapter, IncompleteClient, OnboardingState, ProcessoResumo } from "./crm-adapter.js";
 import { validateNivel1 } from "./nivel-validator.js";
 
 export interface HttpCrmConfig {
@@ -215,6 +215,34 @@ export class HttpCrmAdapter implements CrmAdapter {
       return null;
     } catch {
       return null;
+    }
+  }
+
+  async getClientProcesses(clienteId: string): Promise<ProcessoResumo[]> {
+    try {
+      // CRM AG: buscar processos ligados ao cliente
+      const data = await this.request(
+        "GET",
+        `/api/pessoas/${clienteId}/processos`
+      );
+
+      const processos = data.data?.data ?? data.data ?? [];
+
+      return processos.map((p: any) => ({
+        id: p.id,
+        referencia: p.referencia ?? p.numero ?? undefined,
+        area: p.area ?? p.tipoProcesso ?? "outro",
+        estado: p.estado ?? p.status ?? "desconhecido",
+        ultimo_andamento: p.ultimoAndamento ?? p.observacoes ?? undefined,
+        data_ultimo_andamento:
+          p.dataUltimoAndamento ?? p.updatedAt ?? undefined,
+        advogado_responsavel:
+          p.advogadoResponsavel ?? p.responsavel?.nome ?? undefined,
+        proxima_accao: p.proximaAccao ?? undefined,
+      }));
+    } catch (error) {
+      console.error("[CRM] Erro getClientProcesses:", error);
+      return [];
     }
   }
 

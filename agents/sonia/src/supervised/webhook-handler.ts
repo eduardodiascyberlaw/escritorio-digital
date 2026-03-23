@@ -307,14 +307,41 @@ REGRAS:
 
     // 5a. Conversa — responder naturalmente, sem criar ticket
     if (intent.category === "conversa") {
+      let extraContext = "";
+      let contextTag = `💬 Conversa (${intent.intent}) — sem triagem`;
+
+      // Para status de processo, consultar o CRM primeiro
+      if (intent.intent === "status_processo") {
+        const processos = await this.crm.getClientProcesses(resolved.clienteId);
+
+        if (processos.length > 0) {
+          const info = processos
+            .map((p) => {
+              const parts = [`Processo: ${p.referencia ?? p.id}`, `Area: ${p.area}`, `Estado: ${p.estado}`];
+              if (p.ultimo_andamento) parts.push(`Ultimo andamento: ${p.ultimo_andamento}`);
+              if (p.data_ultimo_andamento) parts.push(`Data: ${new Date(p.data_ultimo_andamento).toLocaleDateString("pt-PT")}`);
+              if (p.advogado_responsavel) parts.push(`Advogado: ${p.advogado_responsavel}`);
+              if (p.proxima_accao) parts.push(`Proxima accao: ${p.proxima_accao}`);
+              return parts.join(" | ");
+            })
+            .join("\n");
+
+          extraContext = `\n\nINFORMACAO DO CRM (usar para responder ao cliente de forma acessivel, sem jargao — nunca mostrar IDs nem dados internos):\n${info}`;
+          contextTag = `📂 Status processo — ${processos.length} processo(s) encontrado(s)`;
+        } else {
+          extraContext = `\n\nINFORMACAO DO CRM: Nenhum processo encontrado para este cliente. Informar que vais verificar com a equipa.`;
+          contextTag = `📂 Status processo — nenhum processo encontrado`;
+        }
+      }
+
       const response = await this.gemini.generateText(
         CONVERSATION_PROMPT,
-        `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem: "${text}"`
+        `Nome do cliente: ${name ?? "desconhecido"}\nTelefone: ${phone}\nMensagem: "${text}"${extraContext}`
       );
 
       return {
         response,
-        context: `💬 Conversa (${intent.intent}) — sem triagem`,
+        context: contextTag,
       };
     }
 

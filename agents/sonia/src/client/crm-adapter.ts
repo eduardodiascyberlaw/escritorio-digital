@@ -23,6 +23,17 @@ export interface IncompleteClient {
   camposEmFalta: string[];
 }
 
+export interface ProcessoResumo {
+  id: string;
+  referencia?: string;
+  area: string;
+  estado: string;
+  ultimo_andamento?: string;
+  data_ultimo_andamento?: string;
+  advogado_responsavel?: string;
+  proxima_accao?: string;
+}
+
 export interface CrmAdapter {
   findByPhone(phone: string): Promise<Partial<ClienteNivel1> | null>;
   create(client: Partial<ClienteNivel1>): Promise<string>;
@@ -33,6 +44,7 @@ export interface CrmAdapter {
     state: OnboardingState
   ): Promise<void>;
   listIncompleteClients(): Promise<IncompleteClient[]>;
+  getClientProcesses(clienteId: string): Promise<ProcessoResumo[]>;
 }
 
 export class StubCrmAdapter implements CrmAdapter {
@@ -79,7 +91,10 @@ export class StubCrmAdapter implements CrmAdapter {
   }
 
   async listIncompleteClients(): Promise<IncompleteClient[]> {
-    // Stub: return empty
+    return [];
+  }
+
+  async getClientProcesses(): Promise<ProcessoResumo[]> {
     return [];
   }
 }
