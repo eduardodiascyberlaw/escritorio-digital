@@ -15,6 +15,14 @@ export interface OnboardingState {
   percentagem: number;
 }
 
+export interface IncompleteClient {
+  id: string;
+  nome: string;
+  telefone?: string;
+  percentagem: number;
+  camposEmFalta: string[];
+}
+
 export interface CrmAdapter {
   findByPhone(phone: string): Promise<Partial<ClienteNivel1> | null>;
   create(client: Partial<ClienteNivel1>): Promise<string>;
@@ -24,6 +32,7 @@ export interface CrmAdapter {
     clienteId: string,
     state: OnboardingState
   ): Promise<void>;
+  listIncompleteClients(): Promise<IncompleteClient[]>;
 }
 
 export class StubCrmAdapter implements CrmAdapter {
@@ -67,5 +76,10 @@ export class StubCrmAdapter implements CrmAdapter {
     state: OnboardingState
   ): Promise<void> {
     this.onboarding.set(clienteId, state);
+  }
+
+  async listIncompleteClients(): Promise<IncompleteClient[]> {
+    // Stub: return empty
+    return [];
   }
 }

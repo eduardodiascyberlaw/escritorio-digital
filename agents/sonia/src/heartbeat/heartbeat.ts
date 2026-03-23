@@ -5,6 +5,7 @@ import type { EvolutionApiGateway } from "../gateway/evolution-api.js";
 import { TIMEZONE } from "../schedule/business-hours.js";
 import { executeMorningRoutine } from "../schedule/morning-routine.js";
 import { sendDailyReport } from "../schedule/daily-report.js";
+import { executeCrmAudit } from "../schedule/crm-audit.js";
 
 export interface HeartbeatDeps {
   gateway: EvolutionApiGateway;
@@ -39,8 +40,8 @@ export function startHeartbeat(deps: HeartbeatDeps): void {
         console.log("[Heartbeat 09:00] Rotina matinal...");
         await executeMorningRoutine(deps.supervised);
 
-        // TODO: CRM audit — verificar registos incompletos
-        // Sera implementado na fase 2.6
+        console.log("[Heartbeat 09:00] Auditoria CRM...");
+        await executeCrmAudit(deps.crm, deps.gateway, deps.controlGroupJid);
       } catch (error) {
         console.error("[Heartbeat 09:00] Erro:", error);
       }

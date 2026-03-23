@@ -1,5 +1,6 @@
 import type { ClienteNivel1 } from "@sd-legal/shared";
-import type { CrmAdapter, OnboardingState } from "./crm-adapter.js";
+import type { CrmAdapter, IncompleteClient, OnboardingState } from "./crm-adapter.js";
+import { validateNivel1 } from "./nivel-validator.js";
 
 export interface HttpCrmConfig {
   apiUrl: string;
@@ -214,6 +215,38 @@ export class HttpCrmAdapter implements CrmAdapter {
       return null;
     } catch {
       return null;
+    }
+  }
+
+  async listIncompleteClients(): Promise<IncompleteClient[]> {
+    try {
+      // Fetch recent clients (last 100, sorted by creation date desc)
+      const data = await this.request(
+        "GET",
+        "/api/pessoas?limit=100&categoria=CLIENTE&orderBy=createdAt&order=desc"
+      );
+
+      const results: IncompleteClient[] = [];
+
+      for (const person of data.data?.data ?? []) {
+        const mapped = this.mapToClienteNivel1(person);
+        const validation = validateNivel1(mapped);
+
+        if (!validation.complete) {
+          results.push({
+            id: person.id,
+            nome: person.nome ?? "Sem nome",
+            telefone: person.whatsapp ?? person.telemovel ?? undefined,
+            percentagem: validation.percentagem,
+            camposEmFalta: validation.missing,
+          });
+        }
+      }
+
+      return results;
+    } catch (error) {
+      console.error("[CRM] Erro listIncompleteClients:", error);
+      return [];
     }
   }
 
