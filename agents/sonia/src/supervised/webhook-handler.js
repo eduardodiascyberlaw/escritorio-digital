@@ -24,6 +24,7 @@ export class WebhookHandler {
     paperclip;
     gateway;
     memory;
+    calendar;
     transcriber;
     controlGroupJid = null;
     batcher;
@@ -42,6 +43,7 @@ export class WebhookHandler {
         this.gateway = deps.gateway;
         this.memory = deps.memory;
         this.campaignStore = deps.campaignStore;
+        this.calendar = deps.calendar;
         this.controlGroupJid = deps.controlGroupJid;
         this.transcriber = new AudioTranscriber(deps.gemini);
         this.batcher = new MessageBatcher(30_000, (phone, name, text, hasAudio) => this.processBatch(phone, name, text, hasAudio));

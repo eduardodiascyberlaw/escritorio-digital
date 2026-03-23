@@ -14,6 +14,7 @@ import { ElevenLabsTts } from "./tts/elevenlabs-tts.js";
 import { ConversationMemory } from "./conversation/conversation-memory.js";
 import { RgpdCampaignStore } from "./rgpd/rgpd-campaign-store.js";
 import type { CrmAdapter } from "./client/crm-adapter.js";
+import { GoogleCalendarAdapter } from "./calendar/google-calendar-adapter.js";
 
 // ─────────────────────────────────────────────
 // Configuração
@@ -68,6 +69,7 @@ const tts = new ElevenLabsTts({
 });
 
 const memory = new ConversationMemory();
+const calendar = new GoogleCalendarAdapter();
 const DATA_DIR = process.env.SONIA_DATA_DIR ?? "./data";
 const campaignStore = new RgpdCampaignStore(`${DATA_DIR}/rgpd-campaign.json`);
 const supervised = new SupervisedMode(gateway, CONTROL_GROUP_NAME, tts, vaultWriter, memory);
@@ -164,6 +166,7 @@ async function start(): Promise<void> {
     gateway,
     memory,
     campaignStore,
+    calendar,
     controlGroupJid,
   });
 

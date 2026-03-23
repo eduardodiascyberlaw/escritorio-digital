@@ -31,6 +31,7 @@ import { CONVERSATION_PROMPT, buildConversationPromptWithServices } from "../llm
 import { findRelevantServices, getService, formatServicesForPrompt } from "../knowledge/service-kb.js";
 import type { ConversationMemory } from "../conversation/conversation-memory.js";
 import { MessageBatcher } from "../conversation/message-batcher.js";
+import type { CalendarAdapter } from "../calendar/calendar-adapter.js";
 
 // Evolution API webhook payload types
 interface WebhookMessage {
@@ -66,6 +67,7 @@ export class WebhookHandler {
   private paperclip: PaperclipAdapter;
   private gateway: EvolutionApiGateway;
   private memory: ConversationMemory;
+  private calendar: CalendarAdapter;
   private transcriber: AudioTranscriber;
   private controlGroupJid: string | null = null;
   private batcher: MessageBatcher;
@@ -87,6 +89,7 @@ export class WebhookHandler {
     gateway: EvolutionApiGateway;
     memory: ConversationMemory;
     campaignStore: RgpdCampaignStore;
+    calendar: CalendarAdapter;
     controlGroupJid: string | null;
   }) {
     this.supervised = deps.supervised;
@@ -98,6 +101,7 @@ export class WebhookHandler {
     this.gateway = deps.gateway;
     this.memory = deps.memory;
     this.campaignStore = deps.campaignStore;
+    this.calendar = deps.calendar;
     this.controlGroupJid = deps.controlGroupJid;
     this.transcriber = new AudioTranscriber(deps.gemini);
     this.batcher = new MessageBatcher(30_000, (phone, name, text, hasAudio) =>
