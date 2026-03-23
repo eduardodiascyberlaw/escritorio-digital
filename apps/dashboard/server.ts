@@ -32,7 +32,7 @@ await app.register(fastifyCookie);
 await app.register(fastifySession, {
   secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production-min-32-chars!!',
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.COOKIE_SECURE === 'true',
     httpOnly: true,
     sameSite: 'lax',
     maxAge: 365 * 24 * 60 * 60 * 1000,
