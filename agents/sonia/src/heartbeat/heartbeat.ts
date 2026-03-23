@@ -2,15 +2,20 @@ import cron from "node-cron";
 import type { CrmAdapter } from "../client/crm-adapter.js";
 import type { SupervisedMode } from "../supervised/supervised-mode.js";
 import type { EvolutionApiGateway } from "../gateway/evolution-api.js";
+import type { VaultReader } from "../obsidian/vault-reader.js";
+import type { RgpdCampaignStore } from "../rgpd/rgpd-campaign-store.js";
 import { TIMEZONE } from "../schedule/business-hours.js";
 import { executeMorningRoutine } from "../schedule/morning-routine.js";
 import { sendDailyReport } from "../schedule/daily-report.js";
 import { executeCrmAudit } from "../schedule/crm-audit.js";
+import { executeRgpdRegularization } from "../rgpd/rgpd-regularization.js";
 
 export interface HeartbeatDeps {
   gateway: EvolutionApiGateway;
   crm: CrmAdapter;
   supervised: SupervisedMode;
+  vaultReader: VaultReader;
+  campaignStore: RgpdCampaignStore;
   controlGroupJid: string | null;
 }
 
@@ -50,6 +55,28 @@ export function startHeartbeat(deps: HeartbeatDeps): void {
   );
 
   // ─────────────────────────────────────────────
+  // 10:00 Seg-Sex: Campanha regularizacao RGPD
+  // ─────────────────────────────────────────────
+  cron.schedule(
+    "0 10 * * 1-5",
+    async () => {
+      try {
+        console.log("[Heartbeat 10:00] Regularizacao RGPD...");
+        await executeRgpdRegularization({
+          crm: deps.crm,
+          gateway: deps.gateway,
+          vaultReader: deps.vaultReader,
+          campaignStore: deps.campaignStore,
+          controlGroupJid: deps.controlGroupJid,
+        });
+      } catch (error) {
+        console.error("[Heartbeat 10:00] Erro:", error);
+      }
+    },
+    { timezone: TIMEZONE }
+  );
+
+  // ─────────────────────────────────────────────
   // 18:00 Seg-Sex: Relatorio diario
   // ─────────────────────────────────────────────
   cron.schedule(
@@ -66,6 +93,6 @@ export function startHeartbeat(deps: HeartbeatDeps): void {
   );
 
   console.log(
-    `[Heartbeat] Agendado: 5min + 09:00 rotina matinal + 18:00 relatorio (${TIMEZONE})`
+    `[Heartbeat] Agendado: 5min + 09:00 rotina + 10:00 RGPD + 18:00 relatorio (${TIMEZONE})`
   );
 }
