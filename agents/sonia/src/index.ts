@@ -12,7 +12,8 @@ import { StubPaperclipAdapter } from "./tickets/paperclip-adapter.js";
 import { startHeartbeat } from "./heartbeat/heartbeat.js";
 import { ElevenLabsTts } from "./tts/elevenlabs-tts.js";
 import { ConversationMemory } from "./conversation/conversation-memory.js";
-import { RgpdCampaignStore } from "./rgpd/rgpd-campaign-store.js";
+// RGPD desactivado — será tratado numa fase posterior
+// import { RgpdCampaignStore } from "./rgpd/rgpd-campaign-store.js";
 import type { CrmAdapter } from "./client/crm-adapter.js";
 import { GoogleCalendarAdapter } from "./calendar/google-calendar-adapter.js";
 
@@ -70,8 +71,6 @@ const tts = new ElevenLabsTts({
 
 const memory = new ConversationMemory();
 const calendar = new GoogleCalendarAdapter();
-const DATA_DIR = process.env.SONIA_DATA_DIR ?? "./data";
-const campaignStore = new RgpdCampaignStore(`${DATA_DIR}/rgpd-campaign.json`);
 const supervised = new SupervisedMode(gateway, CONTROL_GROUP_NAME, tts, vaultWriter, memory);
 
 // ─────────────────────────────────────────────
@@ -144,9 +143,6 @@ async function start(): Promise<void> {
   );
   console.log(`[Sónia] Vault: ${config.obsidianVaultPath}`);
 
-  // Load RGPD campaign tracking state
-  await campaignStore.load();
-
   // Initialize supervised mode (find control group)
   await supervised.initialize();
 
@@ -165,13 +161,13 @@ async function start(): Promise<void> {
     paperclip,
     gateway,
     memory,
-    campaignStore,
+    // campaignStore — RGPD desactivado
     calendar,
     controlGroupJid,
   });
 
   // Start heartbeat
-  startHeartbeat({ gateway, crm, supervised, vaultReader, campaignStore, controlGroupJid });
+  startHeartbeat({ gateway, crm, supervised, vaultReader, controlGroupJid });
 
   // Start HTTP server
   server.listen(PORT, () => {

@@ -14,11 +14,9 @@ import { addOvernightMessage } from "../schedule/morning-routine.js";
 import { trackEvent } from "../schedule/daily-report.js";
 import { resolveClient } from "../client/resolver.js";
 import { validateNivel1 } from "../client/nivel-validator.js";
-import {
-  processConsentResponse,
-  recordConsent,
-} from "../rgpd/consent-flow.js";
-import type { RgpdCampaignStore } from "../rgpd/rgpd-campaign-store.js";
+// RGPD desactivado — será tratado numa fase posterior
+// import { processConsentResponse, recordConsent } from "../rgpd/consent-flow.js";
+// import type { RgpdCampaignStore } from "../rgpd/rgpd-campaign-store.js";
 import { classifyConversation } from "../classification/classifier.js";
 import { createTriagemTicket } from "../tickets/ticket-factory.js";
 import { extractDocument } from "../ocr/document-ocr.js";
@@ -76,8 +74,8 @@ export class WebhookHandler {
   private seenMessages = new Map<string, number>();
   private static DEDUP_TTL_MS = 5 * 60 * 1000;
 
-  // RGPD campaign tracking (detects responses to regularization messages)
-  private campaignStore: RgpdCampaignStore;
+  // RGPD campaign tracking — desactivado, será tratado numa fase posterior
+  // private campaignStore: RgpdCampaignStore;
 
   constructor(deps: {
     supervised: SupervisedMode;
@@ -88,7 +86,7 @@ export class WebhookHandler {
     paperclip: PaperclipAdapter;
     gateway: EvolutionApiGateway;
     memory: ConversationMemory;
-    campaignStore: RgpdCampaignStore;
+    // campaignStore: RgpdCampaignStore; — RGPD desactivado
     calendar: CalendarAdapter;
     controlGroupJid: string | null;
   }) {
@@ -100,7 +98,7 @@ export class WebhookHandler {
     this.paperclip = deps.paperclip;
     this.gateway = deps.gateway;
     this.memory = deps.memory;
-    this.campaignStore = deps.campaignStore;
+    // this.campaignStore = deps.campaignStore; — RGPD desactivado
     this.calendar = deps.calendar;
     this.controlGroupJid = deps.controlGroupJid;
     this.transcriber = new AudioTranscriber(deps.gemini);
@@ -329,74 +327,11 @@ export class WebhookHandler {
       drive: new StubDriveAdapter(),
     });
 
-    // 3. Check if this is a response to RGPD regularization campaign
-    const campaignRecord = this.campaignStore.get(phone);
-    if (campaignRecord?.estado === "enviado") {
-      const consentResult = processConsentResponse(text);
-
-      if (consentResult.state === "aceite") {
-        await this.campaignStore.set(phone, {
-          ...campaignRecord,
-          estado: "aceite",
-        });
-        await recordConsent(
-          resolved.clienteId,
-          phone,
-          "[regularizacao RGPD v1.0]",
-          text,
-          consentResult,
-          this.crm,
-          this.vaultWriter
-        );
-
-        // Auto-enviar confirmacao (sem passar pelo grupo)
-        const ack =
-          "Obrigada! O vosso consentimento ficou registado com sucesso. Se precisarem de alguma coisa, estou a disposicao!";
-        await this.gateway.sendMessage(phone, ack);
-        this.memory.add(phone, "out", ack);
-
-        if (this.controlGroupJid) {
-          await this.gateway.sendToGroup(
-            this.controlGroupJid,
-            `✅ *RGPD REGULARIZADO* — ${name ?? phone} deu consentimento`
-          );
-        }
-
-        return { response: "", context: "", skipDraft: true };
-      }
-
-      if (consentResult.state === "recusado") {
-        await this.campaignStore.set(phone, {
-          ...campaignRecord,
-          estado: "recusado",
-        });
-
-        if (this.controlGroupJid) {
-          await this.gateway.sendToGroup(
-            this.controlGroupJid,
-            `⚠️ *RGPD RECUSADO* — ${name ?? phone} recusou consentimento. Accao humana necessaria.`
-          );
-        }
-
-        return {
-          response:
-            consentResult.responseToClient ?? "Obrigado pela resposta.",
-          context: `🔒 RGPD recusado — escalado para humano`,
-        };
-      }
-
-      // Resposta ambigua (recusa_parcial) — pode nao ser sobre RGPD, continuar normalmente
-    }
+    // 3. RGPD campaign detection — desactivado, será tratado numa fase posterior
 
     // 4. Check onboarding completeness
     const validation = validateNivel1(resolved.data);
     if (!validation.complete) {
-      // Se RGPD esta nos campos em falta, incluir pedido de consentimento no onboarding
-      const rgpdMissing = validation.missing.includes("rgpd");
-      const rgpdInstruction = rgpdMissing
-        ? `\n- O campo "rgpd" esta em falta. Pede o consentimento para tratamento de dados pessoais conforme o RGPD de forma natural, como parte da recolha de dados. Explica que e necessario para prestar servicos juridicos. Se o cliente disser SIM, regista como consentimento dado.`
-        : "";
-
       const { buildPrompt } = await import("../identity/prompt-builder.js");
       const onboardingPrompt = buildPrompt(
         `TAREFA: Estas a recolher dados de um cliente. Faltam estes campos: ${validation.missing.join(", ")}.
@@ -405,7 +340,7 @@ REGRAS:
 - Pede no maximo 2 dados por mensagem.
 - Sempre trata o cliente por Sr./Sra. + primeiro nome.
 - Tom profissional mas caloroso.
-- Nao des pareceres juridicos.${rgpdInstruction}`
+- Nao des pareceres juridicos.`
       );
 
       const onboardingLangInstruction = this.buildLanguageInstruction(phone);

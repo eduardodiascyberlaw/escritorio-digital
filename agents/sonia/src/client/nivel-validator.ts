@@ -23,7 +23,7 @@ const NIVEL1_FIELDS: Array<keyof ClienteNivel1> = [
   "telefone_whatsapp",
   "email",
   "lingua_preferencial",
-  "rgpd",
+  // "rgpd" — removido temporariamente; RGPD será tratado numa fase posterior
   "como_chegou",
   "data_primeiro_contacto",
 ];
@@ -52,11 +52,7 @@ export function validateNivel1(
   const missing: string[] = [];
 
   for (const field of NIVEL1_FIELDS) {
-    if (field === "rgpd") {
-      if (!client.rgpd?.consentimento_dados_pessoais) {
-        missing.push("rgpd");
-      }
-    } else if (field === "nif") {
+    if (field === "nif") {
       // NIF is optional if justification is provided
       continue;
     } else {
