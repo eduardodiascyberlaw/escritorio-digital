@@ -33,12 +33,12 @@ export interface EvolutionWebhookFormat {
       remoteJid: string;
       participant?: string;
     };
-    pushName: string | null;
-    message: {
-      conversation: string | null;
-      extendedTextMessage: null;
-      imageMessage: { caption: string } | null;
-      audioMessage: { mimetype: string; url: string | null } | null;
+    pushName?: string;
+    message?: {
+      conversation?: string;
+      extendedTextMessage?: { text: string };
+      imageMessage?: { mimetype: string; caption?: string };
+      audioMessage?: { mimetype: string };
     };
   };
   _zapiOriginal: ZApiIncomingPayload;
@@ -64,18 +64,17 @@ export function adaptZApiWebhook(zapiPayload: ZApiIncomingPayload): EvolutionWeb
     : undefined;
 
   // Extract text content
-  let conversation: string | null = null;
-  let audioMessage: { mimetype: string; url: string | null } | null = null;
-  let imageCaption: string | null = null;
+  let conversation: string | undefined;
+  let audioMessage: { mimetype: string } | undefined;
+  let imageMessage: { mimetype: string; caption?: string } | undefined;
 
   if (zapiPayload.text?.message) {
     conversation = zapiPayload.text.message;
   } else if (zapiPayload.image?.caption) {
-    imageCaption = zapiPayload.image.caption;
+    imageMessage = { mimetype: "image/jpeg", caption: zapiPayload.image.caption };
   } else if (zapiPayload.audio) {
     audioMessage = {
       mimetype: zapiPayload.audio.mimeType ?? "audio/ogg",
-      url: zapiPayload.audio.audioUrl ?? zapiPayload.audio.fileUrl ?? null,
     };
   }
 
@@ -89,11 +88,10 @@ export function adaptZApiWebhook(zapiPayload: ZApiIncomingPayload): EvolutionWeb
         remoteJid,
         participant: participantJid,
       },
-      pushName: senderName,
+      pushName: senderName ?? undefined,
       message: {
         conversation,
-        extendedTextMessage: null,
-        imageMessage: imageCaption ? { caption: imageCaption } : null,
+        imageMessage,
         audioMessage,
       },
     },
