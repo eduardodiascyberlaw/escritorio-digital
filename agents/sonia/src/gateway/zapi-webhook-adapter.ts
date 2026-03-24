@@ -25,6 +25,7 @@ export interface ZApiIncomingPayload {
 
 export interface EvolutionWebhookFormat {
   event: "messages.upsert";
+  instance: string;
   data: {
     key: {
       id: string;
@@ -80,6 +81,7 @@ export function adaptZApiWebhook(zapiPayload: ZApiIncomingPayload): EvolutionWeb
 
   return {
     event: "messages.upsert",
+    instance: "zapi",
     data: {
       key: {
         id: messageId,
