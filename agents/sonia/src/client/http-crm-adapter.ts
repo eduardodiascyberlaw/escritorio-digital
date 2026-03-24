@@ -13,9 +13,57 @@ export class HttpCrmAdapter implements CrmAdapter {
   private token: string | null = null;
   private tokenExpiry = 0;
   private onboardingCache = new Map<string, OnboardingState>();
+  private static MAX_RETRIES = 3;
+  private static TIMEOUT_MS = 10_000;
 
   constructor(config: HttpCrmConfig) {
     this.config = config;
+  }
+
+  private async fetchWithTimeout(
+    url: string,
+    opts: RequestInit
+  ): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(
+      () => controller.abort(),
+      HttpCrmAdapter.TIMEOUT_MS
+    );
+    try {
+      return await fetch(url, { ...opts, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  private async withRetry<T>(
+    label: string,
+    fn: () => Promise<T>
+  ): Promise<T> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= HttpCrmAdapter.MAX_RETRIES; attempt++) {
+      try {
+        return await fn();
+      } catch (error: any) {
+        lastError = error;
+        const isNetwork =
+          error.name === "AbortError" ||
+          error.cause?.code === "ECONNREFUSED" ||
+          error.cause?.code === "ENOTFOUND" ||
+          error.cause?.code === "EAI_AGAIN" ||
+          error.cause?.code === "ETIMEDOUT" ||
+          error.cause?.code === "UND_ERR_CONNECT_TIMEOUT";
+        if (!isNetwork || attempt === HttpCrmAdapter.MAX_RETRIES) {
+          throw error;
+        }
+        const delay = Math.min(1000 * 2 ** (attempt - 1), 8000);
+        console.warn(
+          `[CRM] ${label} falhou (tentativa ${attempt}/${HttpCrmAdapter.MAX_RETRIES}): ${error.message} — retry em ${delay}ms`
+        );
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+    throw lastError;
   }
 
   private async ensureToken(): Promise<string> {
@@ -23,32 +71,37 @@ export class HttpCrmAdapter implements CrmAdapter {
       return this.token;
     }
 
-    const res = await fetch(`${this.config.apiUrl}/api/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: this.config.email,
-        password: this.config.password,
-      }),
+    return this.withRetry("login", async () => {
+      const res = await this.fetchWithTimeout(
+        `${this.config.apiUrl}/api/auth/login`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: this.config.email,
+            password: this.config.password,
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error(`CRM login failed: ${res.status}`);
+      }
+
+      const data = (await res.json()) as {
+        success: boolean;
+        data: { accessToken: string };
+      };
+
+      if (!data.success) {
+        throw new Error("CRM login failed");
+      }
+
+      this.token = data.data.accessToken;
+      // Token expires in 15min, refresh at 12min
+      this.tokenExpiry = Date.now() + 12 * 60 * 1000;
+      return this.token;
     });
-
-    if (!res.ok) {
-      throw new Error(`CRM login failed: ${res.status}`);
-    }
-
-    const data = (await res.json()) as {
-      success: boolean;
-      data: { accessToken: string };
-    };
-
-    if (!data.success) {
-      throw new Error("CRM login failed");
-    }
-
-    this.token = data.data.accessToken;
-    // Token expires in 15min, refresh at 12min
-    this.tokenExpiry = Date.now() + 12 * 60 * 1000;
-    return this.token;
   }
 
   private async request(
@@ -58,27 +111,32 @@ export class HttpCrmAdapter implements CrmAdapter {
   ): Promise<any> {
     const token = await this.ensureToken();
 
-    const res = await fetch(`${this.config.apiUrl}${path}`, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      ...(body ? { body: JSON.stringify(body) } : {}),
+    return this.withRetry(`${method} ${path}`, async () => {
+      const res = await this.fetchWithTimeout(
+        `${this.config.apiUrl}${path}`,
+        {
+          method,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          ...(body ? { body: JSON.stringify(body) } : {}),
+        }
+      );
+
+      if (res.status === 429) {
+        console.warn("[CRM] Rate limit — aguardar 30s...");
+        await new Promise((r) => setTimeout(r, 30000));
+        return this.request(method, path, body);
+      }
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`CRM ${method} ${path}: ${res.status} ${errorText}`);
+      }
+
+      return res.json();
     });
-
-    if (res.status === 429) {
-      console.warn("[CRM] Rate limit — aguardar 30s...");
-      await new Promise((r) => setTimeout(r, 30000));
-      return this.request(method, path, body);
-    }
-
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`CRM ${method} ${path}: ${res.status} ${errorText}`);
-    }
-
-    return res.json();
   }
 
   async findByPhone(phone: string): Promise<Partial<ClienteNivel1> | null> {

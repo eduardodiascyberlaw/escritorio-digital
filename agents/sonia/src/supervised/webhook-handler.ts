@@ -44,7 +44,7 @@ interface WebhookMessage {
     extendedTextMessage?: { text: string };
     imageMessage?: { mimetype: string; caption?: string };
     documentMessage?: { mimetype: string; fileName?: string };
-    audioMessage?: { mimetype: string };
+    audioMessage?: { mimetype: string; url?: string };
   };
   messageType?: string;
   pushName?: string;
@@ -148,8 +148,11 @@ export class WebhookHandler {
 
       console.log(`[Webhook] 🎤 Áudio recebido de ${pushName ?? phone} (${mimeType})`);
 
-      // Download audio from Evolution API
-      const audioBuffer = await this.downloadMedia(messageId);
+      // Download audio — prefer Z-API URL, fallback to messageId
+      const mediaUrl = audioMsg.url;
+      const audioBuffer = mediaUrl
+        ? await this.gateway.downloadMediaFromUrl(mediaUrl)
+        : null;
       if (audioBuffer) {
         text = await this.transcriber.transcribe(audioBuffer, mimeType);
         isAudioMessage = true;
@@ -504,42 +507,6 @@ REGRAS:
       data.message?.imageMessage?.caption ??
       null
     );
-  }
-
-  private async downloadMedia(messageId: string): Promise<Buffer | null> {
-    try {
-      const instance = process.env.EVOLUTION_INSTANCE ?? "sd-legal";
-      const apiUrl = process.env.EVOLUTION_API_URL ?? "http://localhost:8080";
-      const apiKey = process.env.EVOLUTION_API_KEY ?? "";
-
-      // Evolution API v2: download media by message ID
-      const res = await fetch(
-        `${apiUrl}/chat/getBase64FromMediaMessage/${instance}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: apiKey,
-          },
-          body: JSON.stringify({
-            message: { key: { id: messageId } },
-          }),
-        }
-      );
-
-      if (!res.ok) {
-        console.error(`[Webhook] Download media falhou: ${res.status}`);
-        return null;
-      }
-
-      const data = (await res.json()) as { base64?: string };
-      if (!data.base64) return null;
-
-      return Buffer.from(data.base64, "base64");
-    } catch (error) {
-      console.error("[Webhook] Erro ao descarregar media:", error);
-      return null;
-    }
   }
 
   private jidToPhone(jid: string): string {

@@ -38,7 +38,7 @@ export interface EvolutionWebhookFormat {
       conversation?: string;
       extendedTextMessage?: { text: string };
       imageMessage?: { mimetype: string; caption?: string };
-      audioMessage?: { mimetype: string };
+      audioMessage?: { mimetype: string; url?: string };
     };
   };
   _zapiOriginal: ZApiIncomingPayload;
@@ -65,7 +65,7 @@ export function adaptZApiWebhook(zapiPayload: ZApiIncomingPayload): EvolutionWeb
 
   // Extract text content
   let conversation: string | undefined;
-  let audioMessage: { mimetype: string } | undefined;
+  let audioMessage: { mimetype: string; url?: string } | undefined;
   let imageMessage: { mimetype: string; caption?: string } | undefined;
 
   if (zapiPayload.text?.message) {
@@ -75,6 +75,7 @@ export function adaptZApiWebhook(zapiPayload: ZApiIncomingPayload): EvolutionWeb
   } else if (zapiPayload.audio) {
     audioMessage = {
       mimetype: zapiPayload.audio.mimeType ?? "audio/ogg",
+      url: zapiPayload.audio.audioUrl ?? zapiPayload.audio.fileUrl,
     };
   }
 
