@@ -4,7 +4,7 @@ import type { CrmAdapter } from "../client/crm-adapter.js";
 import type { VaultReader } from "../obsidian/vault-reader.js";
 import type { VaultWriter } from "../obsidian/vault-writer.js";
 import type { PaperclipAdapter } from "../tickets/paperclip-adapter.js";
-import type { EvolutionApiGateway } from "../gateway/evolution-api.js";
+import type { ZApiGateway } from "../gateway/zapi-gateway.js";
 import { AudioTranscriber } from "../stt/audio-transcriber.js";
 
 import { checkDeontologicalLimits } from "../rules/deontological.js";
@@ -63,7 +63,7 @@ export class WebhookHandler {
   private vaultReader: VaultReader;
   private vaultWriter: VaultWriter;
   private paperclip: PaperclipAdapter;
-  private gateway: EvolutionApiGateway;
+  private gateway: ZApiGateway;
   private memory: ConversationMemory;
   private calendar: CalendarAdapter;
   private transcriber: AudioTranscriber;
@@ -84,7 +84,7 @@ export class WebhookHandler {
     vaultReader: VaultReader;
     vaultWriter: VaultWriter;
     paperclip: PaperclipAdapter;
-    gateway: EvolutionApiGateway;
+    gateway: ZApiGateway;
     memory: ConversationMemory;
     // campaignStore: RgpdCampaignStore; — RGPD desactivado
     calendar: CalendarAdapter;

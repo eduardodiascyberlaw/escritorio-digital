@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import type { CrmAdapter } from "../client/crm-adapter.js";
 import type { SupervisedMode } from "../supervised/supervised-mode.js";
-import type { EvolutionApiGateway } from "../gateway/evolution-api.js";
+import type { ZApiGateway } from "../gateway/zapi-gateway.js";
 import type { VaultReader } from "../obsidian/vault-reader.js";
 // RGPD desactivado — será tratado numa fase posterior
 // import type { RgpdCampaignStore } from "../rgpd/rgpd-campaign-store.js";
@@ -12,7 +12,7 @@ import { sendDailyReport } from "../schedule/daily-report.js";
 import { executeCrmAudit } from "../schedule/crm-audit.js";
 
 export interface HeartbeatDeps {
-  gateway: EvolutionApiGateway;
+  gateway: ZApiGateway;
   crm: CrmAdapter;
   supervised: SupervisedMode;
   vaultReader: VaultReader;

@@ -5,7 +5,7 @@
  * actividades do dia: clientes atendidos, accoes, pendencias.
  */
 
-import type { EvolutionApiGateway } from "../gateway/evolution-api.js";
+import type { ZApiGateway } from "../gateway/zapi-gateway.js";
 
 // ─────────────────────────────────────────────
 // Activity tracking
@@ -133,7 +133,7 @@ const EVENT_ICONS: Record<string, string> = {
  * Limpa os eventos do dia apos envio.
  */
 export async function sendDailyReport(
-  gateway: EvolutionApiGateway,
+  gateway: ZApiGateway,
   controlGroupJid: string | null
 ): Promise<void> {
   const report = generateReport();

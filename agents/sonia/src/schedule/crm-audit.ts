@@ -6,7 +6,7 @@
  */
 
 import type { CrmAdapter, IncompleteClient } from "../client/crm-adapter.js";
-import type { EvolutionApiGateway } from "../gateway/evolution-api.js";
+import type { ZApiGateway } from "../gateway/zapi-gateway.js";
 
 /**
  * Executa a auditoria de registos incompletos no CRM.
@@ -14,7 +14,7 @@ import type { EvolutionApiGateway } from "../gateway/evolution-api.js";
  */
 export async function executeCrmAudit(
   crm: CrmAdapter,
-  gateway: EvolutionApiGateway,
+  gateway: ZApiGateway,
   controlGroupJid: string | null
 ): Promise<number> {
   const incomplete = await crm.listIncompleteClients();

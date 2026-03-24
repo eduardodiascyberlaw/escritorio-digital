@@ -1,7 +1,8 @@
 import { createServer } from "node:http";
 import { loadConfig } from "./config.js";
 import { GeminiClient } from "./llm/gemini-client.js";
-import { EvolutionApiGateway } from "./gateway/evolution-api.js";
+import { ZApiGateway } from "./gateway/zapi-gateway.js";
+import { adaptZApiWebhook } from "./gateway/zapi-webhook-adapter.js";
 import { SupervisedMode } from "./supervised/supervised-mode.js";
 import { WebhookHandler } from "./supervised/webhook-handler.js";
 import { VaultReader } from "./obsidian/vault-reader.js";
@@ -24,12 +25,9 @@ import { GoogleCalendarAdapter } from "./calendar/google-calendar-adapter.js";
 const config = loadConfig();
 const PORT = parseInt(process.env.SONIA_PORT ?? "3101", 10);
 
-const EVOLUTION_API_URL =
-  process.env.EVOLUTION_API_URL ?? "http://localhost:8080";
-const EVOLUTION_API_KEY =
-  process.env.EVOLUTION_API_KEY ?? "";
-const EVOLUTION_INSTANCE =
-  process.env.EVOLUTION_INSTANCE ?? "sd-legal";
+const ZAPI_INSTANCE_ID = process.env.ZAPI_INSTANCE_ID ?? "";
+const ZAPI_TOKEN = process.env.ZAPI_TOKEN ?? "";
+const ZAPI_CLIENT_TOKEN = process.env.ZAPI_CLIENT_TOKEN ?? "";
 const CONTROL_GROUP_NAME =
   process.env.CONTROL_GROUP_NAME ?? "SD Legal";
 
@@ -57,10 +55,10 @@ console.log(`[Sónia] CRM: ${CRM_EMAIL ? "API real" : "stub (sem credenciais)"}`
 
 const paperclip = new StubPaperclipAdapter();
 
-const gateway = new EvolutionApiGateway({
-  baseUrl: EVOLUTION_API_URL,
-  apiKey: EVOLUTION_API_KEY,
-  instanceName: EVOLUTION_INSTANCE,
+const gateway = new ZApiGateway({
+  instanceId: ZAPI_INSTANCE_ID,
+  token: ZAPI_TOKEN,
+  clientToken: ZAPI_CLIENT_TOKEN,
 });
 
 // TTS — ElevenLabs
@@ -74,7 +72,7 @@ const calendar = new GoogleCalendarAdapter();
 const supervised = new SupervisedMode(gateway, CONTROL_GROUP_NAME, tts, vaultWriter, memory);
 
 // ─────────────────────────────────────────────
-// Servidor HTTP (recebe webhooks da Evolution API)
+// Servidor HTTP (recebe webhooks do Z-API)
 // ─────────────────────────────────────────────
 
 let webhookHandler: WebhookHandler;
@@ -94,8 +92,8 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  // Webhook da Evolution API
-  if (req.method === "POST" && req.url === "/api/webhooks/evolution") {
+  // Webhook do Z-API (adaptado para formato Evolution que o WebhookHandler entende)
+  if (req.method === "POST" && req.url === "/api/webhooks/zapi") {
     let body = "";
     req.on("data", (chunk) => (body += chunk));
     req.on("end", async () => {
@@ -103,8 +101,9 @@ const server = createServer(async (req, res) => {
       res.end("OK");
 
       try {
-        const payload = JSON.parse(body);
-        await webhookHandler.handleWebhook(payload);
+        const zapiPayload = JSON.parse(body);
+        const adapted = adaptZApiWebhook(zapiPayload);
+        await webhookHandler.handleWebhook(adapted);
       } catch (error) {
         console.error("[Webhook] Erro ao processar:", error);
       }
@@ -134,10 +133,9 @@ async function start(): Promise<void> {
   console.log("╚════════════════════════════════════════════╝");
   console.log("");
 
-  // Check Evolution API connection
+  // Check Z-API connection
   const status = await gateway.getInstanceStatus().catch(() => "error");
-  console.log(`[Sónia] Evolution API: ${EVOLUTION_API_URL}`);
-  console.log(`[Sónia] Instância: ${EVOLUTION_INSTANCE} (${status})`);
+  console.log(`[Sónia] Gateway: Z-API (${status})`);
   console.log(
     `[Sónia] LLM: Gemini 2.5 Flash via Vertex AI (${config.googleCloudLocation})`
   );
@@ -174,7 +172,7 @@ async function start(): Promise<void> {
     console.log("");
     console.log(`[Sónia] Servidor HTTP na porta ${PORT}`);
     console.log(
-      `[Sónia] Webhook URL: http://localhost:${PORT}/api/webhooks/evolution`
+      `[Sónia] Webhook URL: http://localhost:${PORT}/api/webhooks/zapi`
     );
     console.log(`[Sónia] Health: http://localhost:${PORT}/health`);
     console.log("");

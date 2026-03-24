@@ -1,4 +1,4 @@
-import type { EvolutionApiGateway } from "../gateway/evolution-api.js";
+import type { ZApiGateway } from "../gateway/zapi-gateway.js";
 import type { ElevenLabsTts } from "../tts/elevenlabs-tts.js";
 import type { VaultWriter } from "../obsidian/vault-writer.js";
 import {
@@ -25,7 +25,7 @@ export interface PendingDraft {
 
 export class SupervisedMode {
   private pendingDrafts = new Map<string, PendingDraft>();
-  private gateway: EvolutionApiGateway;
+  private gateway: ZApiGateway;
   private tts: ElevenLabsTts | null;
   private controlGroupJid: string | null = null;
   private controlGroupName: string;
@@ -34,7 +34,7 @@ export class SupervisedMode {
   private superiors: AuthorizedSuperior[];
 
   constructor(
-    gateway: EvolutionApiGateway,
+    gateway: ZApiGateway,
     controlGroupName: string = "SD Legal",
     tts: ElevenLabsTts | null = null,
     vaultWriter: VaultWriter | null = null,
